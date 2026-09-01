@@ -1,12 +1,15 @@
 package handler
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	models "github.com/lebendig13/metrics/internal/model"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateMetricHandler(t *testing.T) {
@@ -120,4 +123,117 @@ func TestUpdateMetricHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetMetricHandler(t *testing.T) {
+	memStorage := models.NewMemStorage()
+	dvalue := int64(1)
+	vvalue := 0.1
+	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	server := NewServer(memStorage)
+	ts := httptest.NewServer(MetricsRouter(server))
+	defer ts.Close()
+
+	type want struct {
+		code        int
+		contentType string
+		body        string
+	}
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		want   want
+	}{
+		{
+			name:   "success",
+			method: http.MethodGet,
+			path:   "/value/counter/PollCount",
+			want: want{
+				code:        http.StatusOK,
+				contentType: "text/plain; charset=utf-8",
+				body:        "1",
+			},
+		},
+		{
+			name:   "unknown metric type",
+			method: http.MethodGet,
+			path:   "/value/counter_test/PollCount",
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+		{
+			name:   "unknown metric name",
+			method: http.MethodGet,
+			path:   "/value/counter/PollCount_test",
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+		{
+			name:   "incorrect metric type",
+			method: http.MethodGet,
+			path:   "/value/gauge/PollCount",
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+	}
+	for _, test := range tests {
+		request, err := http.NewRequest(test.method, ts.URL+test.path, nil)
+		require.NoError(t, err)
+
+		resp, err := ts.Client().Do(request)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, test.want.code, resp.StatusCode)
+
+		if test.want.code == http.StatusOK {
+			resBody, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, test.want.contentType, resp.Header.Get("Content-Type"))
+			assert.Equal(t, test.want.body, string(resBody))
+		}
+	}
+}
+
+func TestGetAllMetricsHandler(t *testing.T) {
+	memStorage := models.NewMemStorage()
+	dvalue := int64(1)
+	vvalue := 0.1
+	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	server := NewServer(memStorage)
+	ts := httptest.NewServer(MetricsRouter(server))
+	defer ts.Close()
+
+	request, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := ts.Client().Do(request)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
+	wantBody := `<!DOCTYPE html>
+	<html>
+	<head><meta charset="utf-8"><title>Metrics</title></head>
+	<body>
+		<ul>
+		
+			<li>Alloc: 0.1000000000</li>
+		
+			<li>PollCount: 1</li>
+		
+		</ul>
+	</body>
+	</html>`
+	assert.Equal(t, wantBody, string(resBody))
 }

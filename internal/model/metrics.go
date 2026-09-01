@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strconv"
 )
 
 const (
@@ -59,4 +60,23 @@ func (ms *MemStorage) InsertOrUpdate(m Metrics) error {
 func (ms *MemStorage) Get(id string) (Metrics, bool) {
 	currentMetric, exists := ms.metrics[id]
 	return currentMetric, exists
+}
+
+func (ms *MemStorage) GetAllMetrics() map[string]string {
+	result := make(map[string]string)
+	for _, m := range ms.metrics {
+		switch m.MType {
+		case Counter:
+			if m.Delta == nil {
+				continue
+			}
+			result[m.ID] = strconv.FormatInt(*m.Delta, 10)
+		case Gauge:
+			if m.Value == nil {
+				continue
+			}
+			result[m.ID] = strconv.FormatFloat(*m.Value, 'f', 10, 64)
+		}
+	}
+	return result
 }

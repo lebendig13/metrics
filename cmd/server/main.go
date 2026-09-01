@@ -11,10 +11,7 @@ func main() {
 	memStorage := models.NewMemStorage()
 	server := handler.NewServer(memStorage)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/update/`, server.UpdateMetricHandler)
-
-	err := http.ListenAndServe(`:8080`, mux)
+	err := http.ListenAndServe(`:8080`, handler.MetricsRouter(server))
 	if err != nil {
 		panic(err)
 	}
