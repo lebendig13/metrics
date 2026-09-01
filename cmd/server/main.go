@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	handler "github.com/lebendig13/metrics/internal/handler"
@@ -8,10 +9,13 @@ import (
 )
 
 func main() {
+	parseFlags()
+
 	memStorage := models.NewMemStorage()
 	server := handler.NewServer(memStorage)
 
-	err := http.ListenAndServe(`:8080`, handler.MetricsRouter(server))
+	fmt.Println("Running server on", flagRunAddr)
+	err := http.ListenAndServe(flagRunAddr, handler.MetricsRouter(server))
 	if err != nil {
 		panic(err)
 	}

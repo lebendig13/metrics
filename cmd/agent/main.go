@@ -9,13 +9,19 @@ import (
 	"github.com/lebendig13/metrics/internal/handler"
 )
 
-const (
-	baseURL        = "http://localhost:8080/update/"
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
+var (
+	baseURL        string
+	pollInterval   time.Duration
+	reportInterval time.Duration
 )
 
 func main() {
+	parseFlags()
+	baseURL = fmt.Sprintf("http://%s/update/", flagServerAddr)
+	pollInterval = time.Duration(flagPollInterval) * time.Second
+	reportInterval = time.Duration(flagReportInterval) * time.Second
+	fmt.Println("Server address: ", baseURL, "; pollInterval = ", pollInterval, "; reportInterval = ", reportInterval)
+
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
