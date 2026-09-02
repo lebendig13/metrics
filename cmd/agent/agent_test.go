@@ -69,7 +69,7 @@ func TestGetMetrics(t *testing.T) {
 	}
 
 	// Повторное получение метрик
-	metrics = agent.GetMetrics(rng)
+	agent.GetMetrics(rng)
 
 	// Счетчик метрик увеличился
 	assert.Equal(t, int64(2), agent.pollCount)

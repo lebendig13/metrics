@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -33,7 +32,7 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	request, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		fmt.Println("Cannot create request with url: ", url)
-		return errors.New(fmt.Sprintf("Cannot create request: %s", err.Error()))
+		return fmt.Errorf("cannot create request: %s", err.Error())
 	}
 
 	request.Header.Set("Content-Type", "text/plain")
@@ -41,13 +40,13 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	response, err := client.Do(request)
 	if err != nil {
 		fmt.Println("Cannot send request with url: ", url)
-		return errors.New(fmt.Sprintf("Cannot send request: %s", err.Error()))
+		return fmt.Errorf("cannot send request: %s", err.Error())
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		fmt.Printf("Got status %v for url %s\r\n", response.StatusCode, url)
-		return errors.New(fmt.Sprintf("Got status %v", response.StatusCode))
+		return fmt.Errorf("got status %v", response.StatusCode)
 	}
 	return nil
 }

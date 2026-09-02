@@ -82,17 +82,17 @@ func TestSendUpdateRequest(t *testing.T) {
 		{
 			name:     "invalid url with space",
 			urlValue: "http://local host:8080/update/gauge/testname/1",
-			want:     "Cannot create request",
+			want:     "cannot create request",
 		},
 		{
 			name:     "invalid url with wrong address",
 			urlValue: "http://testlocalhost:8080/update/gauge/testname/1",
-			want:     "Cannot send request",
+			want:     "cannot send request",
 		},
 		{
 			name:     "error status",
 			urlValue: server.URL + "/update/gauge/testname/1",
-			want:     "Got status 404",
+			want:     "got status 404",
 		},
 	}
 	for _, test := range tests {
