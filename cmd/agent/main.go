@@ -7,20 +7,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lebendig13/metrics/internal/handler"
-)
-
-var (
-	baseURL        string
-	pollInterval   time.Duration
-	reportInterval time.Duration
+	config "github.com/lebendig13/metrics/internal/config"
+	handler "github.com/lebendig13/metrics/internal/handler"
 )
 
 func main() {
-	parseFlags()
-	baseURL = fmt.Sprintf("http://%s/update/", flagServerAddr)
-	pollInterval = time.Duration(flagPollInterval) * time.Second
-	reportInterval = time.Duration(flagReportInterval) * time.Second
+	configFlags := config.ParseAgentFlags()
+	baseURL := fmt.Sprintf("http://%s/update/", configFlags.ServerAddress)
+	pollInterval := time.Duration(configFlags.Intervals.PollInterval) * time.Second
+	reportInterval := time.Duration(configFlags.Intervals.ReportInterval) * time.Second
 	log.Println("Server address: ", baseURL, "; pollInterval = ", pollInterval, "; reportInterval = ", reportInterval)
 
 	client := &http.Client{
