@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	handler "github.com/lebendig13/metrics/internal/handler"
@@ -17,6 +18,6 @@ func main() {
 	fmt.Println("Running server on", flagRunAddr)
 	err := http.ListenAndServe(flagRunAddr, handler.MetricsRouter(server))
 	if err != nil {
-		panic(err)
+		log.Fatal("Server has finished with error: ", err)
 	}
 }
