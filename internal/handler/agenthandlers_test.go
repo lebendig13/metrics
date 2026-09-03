@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -98,7 +98,7 @@ func TestSendUpdateRequest(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := SendUpdateRequest(client, test.urlValue)
-			fmt.Println("Actual error: ", err.Error())
+			log.Println("Actual error: ", err.Error())
 			assert.Contains(t, err.Error(), test.want)
 		})
 	}

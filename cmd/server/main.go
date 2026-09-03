@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -15,7 +14,7 @@ func main() {
 	memStorage := models.NewMemStorage()
 	server := handler.NewServer(memStorage)
 
-	fmt.Println("Running server on", flagRunAddr)
+	log.Println("Running server on", flagRunAddr)
 	err := http.ListenAndServe(flagRunAddr, handler.MetricsRouter(server))
 	if err != nil {
 		log.Fatal("Server has finished with error: ", err)

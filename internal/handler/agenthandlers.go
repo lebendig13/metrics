@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -17,9 +18,9 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) {
 		if v.MType == models.Gauge {
 			metricValue = strconv.FormatFloat(*v.Value, 'f', 10, 64)
 		}
-		fmt.Printf("metricValue %s = %s\r\n", v.ID, metricValue)
+		log.Printf("metricValue %s = %s\r\n", v.ID, metricValue)
 		if metricValue == "" {
-			fmt.Println("Cannot get metricValue")
+			log.Println("Cannot get metricValue")
 			return
 		}
 
@@ -31,7 +32,7 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) {
 func SendUpdateRequest(client *http.Client, url string) error {
 	request, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
-		fmt.Println("Cannot create request with url: ", url)
+		log.Println("Cannot create request with url: ", url)
 		return fmt.Errorf("cannot create request: %s", err.Error())
 	}
 
@@ -39,13 +40,13 @@ func SendUpdateRequest(client *http.Client, url string) error {
 
 	response, err := client.Do(request)
 	if err != nil {
-		fmt.Println("Cannot send request with url: ", url)
+		log.Println("Cannot send request with url: ", url)
 		return fmt.Errorf("cannot send request: %s", err.Error())
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Printf("Got status %v for url %s\r\n", response.StatusCode, url)
+		log.Printf("Got status %v for url %s\r\n", response.StatusCode, url)
 		return fmt.Errorf("got status %v", response.StatusCode)
 	}
 	return nil

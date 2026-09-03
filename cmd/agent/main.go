@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -20,7 +21,7 @@ func main() {
 	baseURL = fmt.Sprintf("http://%s/update/", flagServerAddr)
 	pollInterval = time.Duration(flagPollInterval) * time.Second
 	reportInterval = time.Duration(flagReportInterval) * time.Second
-	fmt.Println("Server address: ", baseURL, "; pollInterval = ", pollInterval, "; reportInterval = ", reportInterval)
+	log.Println("Server address: ", baseURL, "; pollInterval = ", pollInterval, "; reportInterval = ", reportInterval)
 
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -28,18 +29,18 @@ func main() {
 
 	rng := rand.New(rand.NewSource((time.Now().UnixNano())))
 	agent := NewAgent()
-	fmt.Println("Agent started")
+	log.Println("Agent started")
 
 	var timeSinceLastReport time.Duration
 	for {
 		time.Sleep(pollInterval)
 
 		currentMetrics := agent.GetMetrics(rng)
-		fmt.Println("Got all metrics. PollCount = ", agent.pollCount)
+		log.Println("Got all metrics. PollCount = ", agent.pollCount)
 
 		timeSinceLastReport += pollInterval
 		if timeSinceLastReport >= reportInterval {
-			fmt.Println("Start sending metrics to server")
+			log.Println("Start sending metrics to server")
 			handler.SendMetrics(client, currentMetrics, baseURL)
 
 			timeSinceLastReport = 0
