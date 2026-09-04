@@ -33,7 +33,7 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	request, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		log.Println("Cannot create request with url: ", url)
-		return fmt.Errorf("cannot create request: %s", err.Error())
+		return fmt.Errorf("cannot create request: %w", err)
 	}
 
 	request.Header.Set("Content-Type", "text/plain")
@@ -41,7 +41,7 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	response, err := client.Do(request)
 	if err != nil {
 		log.Println("Cannot send request with url: ", url)
-		return fmt.Errorf("cannot send request: %s", err.Error())
+		return fmt.Errorf("cannot send request: %w", err)
 	}
 	defer response.Body.Close()
 
