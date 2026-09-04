@@ -21,7 +21,7 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) {
 		log.Printf("metricValue %s = %s\r\n", v.ID, metricValue)
 		if metricValue == "" {
 			log.Println("Cannot get metricValue")
-			return
+			continue
 		}
 
 		url := baseURL + v.MType + "/" + v.ID + "/" + metricValue
