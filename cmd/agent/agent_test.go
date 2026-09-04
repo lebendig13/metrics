@@ -49,9 +49,11 @@ func TestGetMetrics(t *testing.T) {
 		"Sys",
 		"TotalAlloc",
 		"RandomValue",
+		"NonExistentMetric", // для проверки пропущенных метрик
 	}
 	var exists bool
 	for _, metricName := range allMetricNames {
+		exists = false
 		for _, metric := range metrics {
 			if metricName == metric.ID {
 				exists = true
@@ -65,7 +67,7 @@ func TestGetMetrics(t *testing.T) {
 				break
 			}
 		}
-		assert.Equal(t, true, exists)
+		assert.Equal(t, (metricName != "NonExistentMetric"), exists)
 	}
 
 	// Повторное получение метрик

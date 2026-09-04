@@ -39,6 +39,7 @@ func main() {
 			handler.SendMetrics(client, currentMetrics, baseURL)
 
 			timeSinceLastReport = 0
+			agent.pollCount = 0
 		}
 	}
 }
