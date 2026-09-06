@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,11 @@ func TestSendMetrics(t *testing.T) {
 
 		receivedUrls = append(receivedUrls, r.URL.Path)
 
-		w.WriteHeader(http.StatusOK)
+		if strings.Contains(r.URL.Path, "/update/") {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 	}))
 
 	client := &http.Client{}
@@ -38,29 +43,45 @@ func TestSendMetrics(t *testing.T) {
 	tests := []struct {
 		name         string
 		metricsValue []*models.Metrics
+		url          string
 		want         []string
+		err          string
 	}{
 		{
 			name:         "counter metric",
 			metricsValue: []*models.Metrics{&counterMetric},
+			url:          server.URL + "/update/",
 			want:         []string{"/update/counter/PollCount/1"},
 		},
 		{
 			name:         "gauge metric",
 			metricsValue: []*models.Metrics{&gaugeMetric},
+			url:          server.URL + "/update/",
 			want:         []string{"/update/gauge/Alloc/0.1000000000"},
 		},
 		{
 			name:         "unknown metric",
 			metricsValue: []*models.Metrics{&unknownMetric},
+			url:          server.URL + "/update/",
 			want:         []string{},
+			err:          "couldn't update metrics",
+		},
+		{
+			name:         "pollCount update error",
+			metricsValue: []*models.Metrics{&counterMetric},
+			url:          server.URL + "/unknownreq/",
+			want:         []string{"/unknownreq/counter/PollCount/1"},
+			err:          "couldn't update PollCount",
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			receivedUrls = []string{}
-			SendMetrics(client, test.metricsValue, server.URL+"/update/")
-			assert.Equal(t, receivedUrls, test.want)
+			err := SendMetrics(client, test.metricsValue, test.url)
+			assert.Equal(t, test.want, receivedUrls)
+			if err != nil {
+				assert.Equal(t, test.err, err.Error())
+			}
 		})
 	}
 

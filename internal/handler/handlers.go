@@ -59,21 +59,18 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 
 	if pathSegmentsLen < 2 {
 		res.WriteHeader(http.StatusBadRequest)
-		log.Println("Bad request: no metric type")
 		return
 	}
 
 	mType := pathSegments[1]
 	if mType != models.Counter && mType != models.Gauge {
 		res.WriteHeader(http.StatusBadRequest)
-		log.Println("Bad request: bad type")
 		return
 	}
 	log.Println("mType: ", mType)
 
 	if pathSegmentsLen < 3 {
 		res.WriteHeader(http.StatusNotFound)
-		log.Println("Bad request: no metric type")
 		return
 	}
 
@@ -82,21 +79,18 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 	// ...
 	if mName == "" {
 		res.WriteHeader(http.StatusNotFound)
-		log.Println("Bad request: empty metric name")
 		return
 	}
 	log.Println("mName: ", mName)
 
 	if pathSegmentsLen != 4 {
 		res.WriteHeader(http.StatusBadRequest)
-		log.Println("Bad request: pathSegmentsLen = ", pathSegmentsLen)
 		return
 	}
 
 	mValue := pathSegments[3]
 	if mValue == "" {
 		res.WriteHeader(http.StatusBadRequest)
-		log.Println("Bad request: empty value")
 		return
 	}
 	log.Println("mValue: ", mValue)
@@ -110,7 +104,6 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 		value, err := strconv.ParseInt(mValue, 10, 64)
 		if err != nil {
 			res.WriteHeader(http.StatusBadRequest)
-			log.Println("Bad request: cannot parse counter value")
 			return
 		}
 		metric.Delta = &value
@@ -118,7 +111,6 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 		value, err := strconv.ParseFloat(mValue, 64)
 		if err != nil {
 			res.WriteHeader(http.StatusBadRequest)
-			log.Println("Bad request: cannot parse gauge value")
 			return
 		}
 		metric.Value = &value
@@ -140,13 +132,13 @@ func (s *Server) GetAllMetricsHandler(res http.ResponseWriter, req *http.Request
 	allMetrics := s.memStorage.GetAllMetrics()
 	if err := tmpl.Execute(res, allMetrics); err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
+		log.Println("Internal server error: cannot generate HTML with all metrics")
 	}
 }
 
 func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 	metricType := chi.URLParam(req, "metric_type")
 	if metricType != models.Counter && metricType != models.Gauge {
-		log.Println("Unknown metric type: ", metricType)
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -154,12 +146,10 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 	metricName := chi.URLParam(req, "metric_name")
 	metric, exists := s.memStorage.Get(metricName)
 	if !exists {
-		log.Printf("Value of %s not found\r\n", metricName)
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 	if metric.MType != metricType {
-		log.Printf("Metric %s has type %s\r\n", metricName, metric.MType)
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}

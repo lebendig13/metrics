@@ -36,10 +36,14 @@ func main() {
 		timeSinceLastReport += pollInterval
 		if timeSinceLastReport >= reportInterval {
 			log.Println("Start sending metrics to server")
-			handler.SendMetrics(client, currentMetrics, baseURL)
+			err := handler.SendMetrics(client, currentMetrics, baseURL)
+			if err == nil {
+				agent.pollCount = 0
+			} else {
+				log.Println(err)
+			}
 
 			timeSinceLastReport = 0
-			agent.pollCount = 0
 		}
 	}
 }
