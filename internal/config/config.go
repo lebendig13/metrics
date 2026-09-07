@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"log"
 )
 
 type ServerConfig struct {
@@ -31,5 +32,8 @@ func ParseAgentFlags() AgentConfig {
 	flag.IntVar(&result.Intervals.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&result.Intervals.PollInterval, "p", 2, "poll interval")
 	flag.Parse()
+	log.Println("Server address: ", result.ServerAddress,
+		"; pollInterval = ", result.Intervals.ReportInterval,
+		"; reportInterval = ", result.Intervals.PollInterval)
 	return result
 }

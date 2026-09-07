@@ -1,18 +1,79 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"math/rand"
+	"net/http"
 	"runtime"
+	"time"
 
+	config "github.com/lebendig13/metrics/internal/config"
+	handler "github.com/lebendig13/metrics/internal/handler"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
+type Intervals struct {
+	PollInterval   time.Duration
+	ReportInterval time.Duration
+}
+
 type Agent struct {
+	baseURL   string
+	intervals Intervals
 	pollCount int64
 }
 
-func NewAgent() *Agent {
-	return &Agent{}
+func NewAgentDefault() *Agent {
+	return &Agent{
+		baseURL: "http://localhost:8080/update/",
+		intervals: Intervals{
+			PollInterval:   time.Duration(2) * time.Second,
+			ReportInterval: time.Duration(10) * time.Second,
+		},
+		pollCount: 0,
+	}
+}
+
+func NewAgent(cnf *config.AgentConfig) *Agent {
+	return &Agent{
+		baseURL: fmt.Sprintf("http://%s/update/", cnf.ServerAddress),
+		intervals: Intervals{
+			PollInterval:   time.Duration(cnf.Intervals.PollInterval) * time.Second,
+			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,
+		},
+		pollCount: 0,
+	}
+}
+
+func (a *Agent) Process() {
+	log.Println("Agent started")
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	rng := rand.New(rand.NewSource((time.Now().UnixNano())))
+
+	var timeSinceLastReport time.Duration
+	for {
+		time.Sleep(a.intervals.PollInterval)
+
+		currentMetrics := a.GetMetrics(rng)
+		log.Println("Got all metrics. PollCount = ", a.pollCount)
+
+		timeSinceLastReport += a.intervals.PollInterval
+		if timeSinceLastReport >= a.intervals.ReportInterval {
+			log.Println("Start sending metrics to server")
+			err := handler.SendMetrics(client, currentMetrics, a.baseURL)
+			if err == nil {
+				a.pollCount = 0
+			} else {
+				log.Println(err)
+			}
+
+			timeSinceLastReport = 0
+		}
+	}
 }
 
 func (a *Agent) GetMetrics(rng *rand.Rand) []*models.Metrics {

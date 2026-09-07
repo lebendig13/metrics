@@ -9,7 +9,7 @@ import (
 
 func TestGetMetrics(t *testing.T) {
 	// Начальное состояние
-	agent := NewAgent()
+	agent := NewAgentDefault()
 	assert.Equal(t, int64(0), agent.pollCount)
 
 	// Первое получение метрик
