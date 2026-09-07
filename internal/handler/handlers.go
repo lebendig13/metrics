@@ -26,13 +26,19 @@ const (
 	</html>`
 )
 
-type Server struct {
-	memStorage *models.MemStorage
+type Storage interface {
+	InsertOrUpdate(m models.Metrics) error
+	Get(id string) (models.Metrics, bool)
+	GetAllMetrics() map[string]string
 }
 
-func NewServer(memStorage *models.MemStorage) *Server {
+type Server struct {
+	storage Storage
+}
+
+func NewServer(stg Storage) *Server {
 	return &Server{
-		memStorage: memStorage,
+		storage: stg,
 	}
 }
 
@@ -88,7 +94,7 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 		metric.Value = &value
 	}
 
-	err := s.memStorage.InsertOrUpdate(metric)
+	err := s.storage.InsertOrUpdate(metric)
 	if err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		log.Println("Internal server error: cannot save metric to storage")
@@ -101,7 +107,7 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 
 func (s *Server) GetAllMetricsHandler(res http.ResponseWriter, req *http.Request) {
 	var tmpl = template.Must(template.New("metrics").Parse(allMetricsPage))
-	allMetrics := s.memStorage.GetAllMetrics()
+	allMetrics := s.storage.GetAllMetrics()
 	if err := tmpl.Execute(res, allMetrics); err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		log.Println("Internal server error: cannot generate HTML with all metrics")
@@ -116,7 +122,7 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	metricName := chi.URLParam(req, "metric_name")
-	metric, exists := s.memStorage.Get(metricName)
+	metric, exists := s.storage.Get(metricName)
 	if !exists {
 		res.WriteHeader(http.StatusNotFound)
 		return
