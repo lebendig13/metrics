@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -47,48 +46,21 @@ func MetricsRouter(server *Server) chi.Router {
 }
 
 func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		res.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	path := req.URL.Path[1:]
-	log.Println("Path: ", path)
-	pathSegments := strings.Split(path, "/")
-	pathSegmentsLen := len(pathSegments)
-
-	if pathSegmentsLen < 2 {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	mType := pathSegments[1]
+	mType := chi.URLParam(req, "metric_type")
 	if mType != models.Counter && mType != models.Gauge {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	log.Println("mType: ", mType)
 
-	if pathSegmentsLen < 3 {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	mName := pathSegments[2]
-	// TODO: Проверять имя метрики
-	// ...
+	mName := chi.URLParam(req, "metric_name")
 	if mName == "" {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 	log.Println("mName: ", mName)
 
-	if pathSegmentsLen != 4 {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	mValue := pathSegments[3]
+	mValue := chi.URLParam(req, "metric_value")
 	if mValue == "" {
 		res.WriteHeader(http.StatusBadRequest)
 		return

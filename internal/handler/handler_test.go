@@ -13,6 +13,12 @@ import (
 )
 
 func TestUpdateMetricHandler(t *testing.T) {
+	memStorage := models.NewMemStorage()
+	server := NewServer(memStorage)
+	router := MetricsRouter(server)
+	testServer := httptest.NewServer(router)
+	defer testServer.Close()
+
 	type want struct {
 		code        int
 		contentType string
@@ -45,7 +51,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/update",
 			want: want{
-				code: http.StatusBadRequest,
+				code: http.StatusNotFound,
 			},
 		},
 		{
@@ -77,7 +83,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/update/counter/PollCount/1/test/1/1",
 			want: want{
-				code: http.StatusBadRequest,
+				code: http.StatusNotFound,
 			},
 		},
 		{
@@ -85,7 +91,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/update/counter/PollCount/",
 			want: want{
-				code: http.StatusBadRequest,
+				code: http.StatusNotFound,
 			},
 		},
 		{
@@ -109,10 +115,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			request := httptest.NewRequest(test.method, test.path, nil)
 			w := httptest.NewRecorder()
-
-			memStorage := models.NewMemStorage()
-			server := NewServer(memStorage)
-			server.UpdateMetricHandler(w, request)
+			router.ServeHTTP(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
