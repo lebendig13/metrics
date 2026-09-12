@@ -10,13 +10,13 @@ import (
 )
 
 func main() {
-	configFlags := config.ParseServerFlags()
+	configP := config.GetServerConfig()
 
 	memStorage := models.NewMemStorage()
 	server := handler.NewServer(memStorage)
 
-	log.Println("Running server on", configFlags.RunAddress)
-	err := http.ListenAndServe(configFlags.RunAddress, handler.MetricsRouter(server))
+	log.Println("Running server on", configP.RunAddress)
+	err := http.ListenAndServe(configP.RunAddress, handler.MetricsRouter(server))
 	if err != nil {
 		log.Fatal("Server has finished with error: ", err)
 	}
