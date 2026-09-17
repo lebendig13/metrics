@@ -9,6 +9,7 @@ import (
 
 type ServerConfig struct {
 	RunAddress string `env:"ADDRESS"`
+	LogLevel   string `env:"LOG_LEVEL"`
 }
 
 type AgentConfigIntervals struct {
@@ -23,13 +24,20 @@ type AgentConfig struct {
 
 func GetServerConfig() ServerConfig {
 	var result ServerConfig
-	err := env.Parse(&result)
+	flag.StringVar(&result.RunAddress, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&result.LogLevel, "l", "info", "log level")
+	flag.Parse()
+
+	var envConfig ServerConfig
+	err := env.Parse(&envConfig)
 	if err != nil {
-		log.Fatal("Cannot get environment variable \"ADDRESS\": ", err)
+		log.Fatal("Cannot get environment variables \"ADDRESS\", \"LOG_LEVEL\": ", err)
 	}
-	if result.RunAddress == "" {
-		flag.StringVar(&result.RunAddress, "a", "localhost:8080", "address and port to run server")
-		flag.Parse()
+	if envConfig.RunAddress != "" {
+		result.RunAddress = envConfig.RunAddress
+	}
+	if envConfig.LogLevel != "" {
+		result.LogLevel = envConfig.LogLevel
 	}
 	return result
 }

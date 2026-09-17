@@ -6,9 +6,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 
+	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
@@ -44,11 +48,33 @@ func NewServer(stg Storage) *Server {
 
 func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
+	router.Use(RequestLogger(logger.Log))
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
 	router.Get("/", server.GetAllMetricsHandler)
 	router.Get("/value/{metric_type}/{metric_name}", server.GetMetricHandler)
 
 	return router
+}
+
+func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			lw := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
+			h.ServeHTTP(lw, r)
+
+			duration := time.Since(start)
+			logger.Log.Info("got incoming HTTP request",
+				zap.String("method", r.Method),
+				zap.String("uri", r.RequestURI),
+				zap.Int("status", lw.Status()),
+				zap.Duration("duration", duration),
+				zap.Int("size", lw.BytesWritten()),
+			)
+		})
+	}
 }
 
 func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request) {
