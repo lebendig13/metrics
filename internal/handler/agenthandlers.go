@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -26,10 +29,14 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) error
 		}
 		log.Printf("metricValue %s = %s\r\n", v.ID, metricValue)
 
-		url := baseURL + v.MType + "/" + v.ID + "/" + metricValue
-		err := SendUpdateRequest(client, url)
+		body, err := json.Marshal(v)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Cannot marshal metric %s = %s\r\n", v.ID, metricValue)
+			continue
+		}
+		res := SendUpdateWithJsonRequest(client, baseURL, bytes.NewReader(body))
+		if res != nil {
+			log.Println(res)
 			successRequestCounter--
 
 			if v.ID == "PollCount" {
@@ -50,6 +57,26 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	}
 
 	request.Header.Set("Content-Type", "text/plain")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("cannot send request: %w. URL: %s", err, url)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("got status %v for URL: %s", response.StatusCode, url)
+	}
+	return nil
+}
+
+func SendUpdateWithJsonRequest(client *http.Client, url string, body io.Reader) error {
+	request, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return fmt.Errorf("cannot create request: %w. URL: %s", err, url)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
 
 	response, err := client.Do(request)
 	if err != nil {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"html/template"
 	"io"
 	"log"
@@ -49,7 +50,9 @@ func NewServer(stg Storage) *Server {
 func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
+	router.Post("/update", server.UpdateMetricJsonHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
+	router.Post("/value", server.ValueJsonHandler)
 	router.Get("/", server.GetAllMetricsHandler)
 	router.Get("/value/{metric_type}/{metric_name}", server.GetMetricHandler)
 
@@ -75,6 +78,26 @@ func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 			)
 		})
 	}
+}
+
+func (s *Server) UpdateMetricJsonHandler(res http.ResponseWriter, req *http.Request) {
+	var reqm models.Metrics
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&reqm); err != nil {
+		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err := s.storage.InsertOrUpdate(reqm)
+	if err != nil {
+		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request) {
@@ -169,4 +192,40 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	res.WriteHeader(http.StatusOK)
 	io.WriteString(res, result)
+}
+
+func (s *Server) ValueJsonHandler(res http.ResponseWriter, req *http.Request) {
+	var reqm models.Metrics
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&reqm); err != nil {
+		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	metricType := reqm.MType
+	if metricType != models.Counter && metricType != models.Gauge {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	metricName := reqm.ID
+	metric, exists := s.storage.Get(metricName)
+	if !exists {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if metric.MType != metricType {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	if err := enc.Encode(metric); err != nil {
+		logger.Log.Error("error encoding response", zap.Error(err))
+		return
+	}
 }
