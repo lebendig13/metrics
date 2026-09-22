@@ -50,7 +50,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 		{
 			name:   "no metric",
 			method: http.MethodPost,
-			path:   "/update/",
+			path:   "/update//",
 			want: want{
 				code: http.StatusNotFound,
 			},

@@ -51,10 +51,12 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Post("/update", server.UpdateMetricJSONHandler)
+	router.Post("/update/", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
 	router.Post("/value", server.ValueJSONHandler)
-	router.Get("/", server.GetAllMetricsHandler)
+	router.Post("/value/", server.ValueJSONHandler)
 	router.Get("/value/{metric_type}/{metric_name}", server.GetMetricHandler)
+	router.Get("/", server.GetAllMetricsHandler)
 
 	return router
 }
