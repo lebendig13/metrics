@@ -242,7 +242,7 @@ func TestGetAllMetricsHandler(t *testing.T) {
 	assert.Equal(t, wantBody, string(resBody))
 }
 
-func TestUpdateMetricJsonHandler(t *testing.T) {
+func TestUpdateMetricJSONHandler(t *testing.T) {
 	memStorage := models.NewMemStorage()
 	server := NewServer(memStorage)
 	router := MetricsRouter(server)
@@ -351,7 +351,7 @@ func TestUpdateMetricJsonHandler(t *testing.T) {
 	}
 }
 
-func TestValueJsonHandler(t *testing.T) {
+func TestValueJSONHandler(t *testing.T) {
 	memStorage := models.NewMemStorage()
 	dvalue := int64(1)
 	vvalue := 0.1

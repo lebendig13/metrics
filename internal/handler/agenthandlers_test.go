@@ -133,7 +133,7 @@ func TestSendUpdateRequest(t *testing.T) {
 	defer server.Close()
 }
 
-func TestSendUpdateWithJsonRequest(t *testing.T) {
+func TestSendUpdateWithJSONRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

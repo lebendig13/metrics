@@ -50,9 +50,9 @@ func NewServer(stg Storage) *Server {
 func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
-	router.Post("/update", server.UpdateMetricJsonHandler)
+	router.Post("/update", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
-	router.Post("/value", server.ValueJsonHandler)
+	router.Post("/value", server.ValueJSONHandler)
 	router.Get("/", server.GetAllMetricsHandler)
 	router.Get("/value/{metric_type}/{metric_name}", server.GetMetricHandler)
 
@@ -80,7 +80,7 @@ func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 	}
 }
 
-func (s *Server) UpdateMetricJsonHandler(res http.ResponseWriter, req *http.Request) {
+func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
 	var reqm models.Metrics
 	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&reqm); err != nil {
@@ -194,7 +194,7 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 	io.WriteString(res, result)
 }
 
-func (s *Server) ValueJsonHandler(res http.ResponseWriter, req *http.Request) {
+func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 	var reqm models.Metrics
 	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&reqm); err != nil {

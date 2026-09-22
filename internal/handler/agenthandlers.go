@@ -34,7 +34,7 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) error
 			log.Printf("Cannot marshal metric %s = %s\r\n", v.ID, metricValue)
 			continue
 		}
-		res := SendUpdateWithJsonRequest(client, baseURL, bytes.NewReader(body))
+		res := SendUpdateWithJSONRequest(client, baseURL, bytes.NewReader(body))
 		if res != nil {
 			log.Println(res)
 			successRequestCounter--
@@ -70,7 +70,7 @@ func SendUpdateRequest(client *http.Client, url string) error {
 	return nil
 }
 
-func SendUpdateWithJsonRequest(client *http.Client, url string, body io.Reader) error {
+func SendUpdateWithJSONRequest(client *http.Client, url string, body io.Reader) error {
 	request, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		return fmt.Errorf("cannot create request: %w. URL: %s", err, url)
