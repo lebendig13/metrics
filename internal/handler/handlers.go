@@ -100,6 +100,11 @@ func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Requ
 
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	if err := enc.Encode(&reqm); err != nil {
+		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+	}
 }
 
 func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request) {
