@@ -5,8 +5,8 @@ import (
 )
 
 func main() {
-	configFlags := config.ParseAgentFlags()
+	configP := config.GetAgentConfig()
 
-	agent := NewAgent(&configFlags)
+	agent := NewAgent(&configP)
 	agent.Process()
 }
