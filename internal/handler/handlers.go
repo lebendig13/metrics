@@ -198,6 +198,7 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 func (s *Server) GetAllMetricsHandler(res http.ResponseWriter, req *http.Request) {
 	var tmpl = template.Must(template.New("metrics").Parse(allMetricsPage))
 	allMetrics := s.storage.GetAllMetrics()
+	res.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.Execute(res, allMetrics); err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		log.Println("Internal server error: cannot generate HTML with all metrics")
