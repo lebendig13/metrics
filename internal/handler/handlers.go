@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/middleware"
@@ -50,6 +51,7 @@ func NewServer(stg Storage) *Server {
 func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
+	router.Use(GzipMiddleware)
 	router.Post("/update", server.UpdateMetricJSONHandler)
 	router.Post("/update/", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
@@ -77,9 +79,41 @@ func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 				zap.Int("status", lw.Status()),
 				zap.Duration("duration", duration),
 				zap.Int("size", lw.BytesWritten()),
+				zap.String("content-type", lw.Header().Get("Content-Type")),
+				zap.String("content-encoding", lw.Header().Get("Content-Encoding")),
 			)
 		})
 	}
+}
+
+func GzipMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ow := w
+
+		// чтение сжатого тела запроса от клиента
+		contentEncoding := r.Header.Get("Content-Encoding")
+		sendsGzip := contentEncoding != "" && strings.Contains(contentEncoding, "gzip")
+		if sendsGzip {
+			cr, err := newCompressReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = cr
+			defer cr.Close()
+		}
+
+		// сжатие ответа клиенту
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		supportsGzip := acceptEncoding != "" && strings.Contains(acceptEncoding, "gzip")
+		if supportsGzip {
+			cw := newCompressWriter(w)
+			ow = cw
+			defer cw.Close()
+		}
+
+		h.ServeHTTP(ow, r)
+	})
 }
 
 func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {

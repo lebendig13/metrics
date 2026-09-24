@@ -191,7 +191,6 @@ func TestGetMetricHandler(t *testing.T) {
 
 		resp, err := ts.Client().Do(request)
 		require.NoError(t, err)
-		defer resp.Body.Close()
 
 		assert.Equal(t, test.want.code, resp.StatusCode)
 
@@ -201,6 +200,8 @@ func TestGetMetricHandler(t *testing.T) {
 			assert.Equal(t, test.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, test.want.body, string(resBody))
 		}
+
+		defer resp.Body.Close()
 	}
 }
 

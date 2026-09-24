@@ -84,10 +84,13 @@ func TestSendMetrics(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			receivedBody = ""
 			err := SendMetrics(client, test.metricsValue, test.url)
-			assert.Equal(t, test.want, receivedBody)
 			if err != nil {
 				assert.Equal(t, test.err, err.Error())
+				return
 			}
+			want, compressErr := CompressData(strings.NewReader(test.want))
+			assert.NoError(t, compressErr)
+			assert.Equal(t, want.String(), receivedBody)
 		})
 	}
 

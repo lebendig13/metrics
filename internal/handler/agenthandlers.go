@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,12 +72,19 @@ func SendUpdateRequest(client *http.Client, url string) error {
 }
 
 func SendUpdateWithJSONRequest(client *http.Client, url string, body io.Reader) error {
-	request, err := http.NewRequest(http.MethodPost, url, body)
+	compressedBody, err := CompressData(body)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, url, &compressedBody)
 	if err != nil {
 		return fmt.Errorf("cannot create request: %w. URL: %s", err, url)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -88,4 +96,19 @@ func SendUpdateWithJSONRequest(client *http.Client, url string, body io.Reader) 
 		return fmt.Errorf("got status %v for URL: %s", response.StatusCode, url)
 	}
 	return nil
+}
+
+func CompressData(data io.Reader) (bytes.Buffer, error) {
+	var compressedData bytes.Buffer
+	zw := gzip.NewWriter(&compressedData)
+
+	if _, err := io.Copy(zw, data); err != nil {
+		return compressedData, fmt.Errorf("cannot compress data: %w", err)
+	}
+
+	if err := zw.Close(); err != nil {
+		return compressedData, fmt.Errorf("cannot close gzip writer: %w", err)
+	}
+
+	return compressedData, nil
 }
