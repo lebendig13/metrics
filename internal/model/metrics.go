@@ -34,6 +34,9 @@ func NewMemStorage() *MemStorage {
 }
 
 func (ms *MemStorage) InsertOrUpdate(m Metrics) error {
+	if m.ID == "" {
+		return errors.New("empty metric ID")
+	}
 	switch m.MType {
 	case Counter:
 		if m.Delta == nil {
@@ -77,6 +80,14 @@ func (ms *MemStorage) GetAllMetrics() map[string]string {
 			}
 			result[m.ID] = strconv.FormatFloat(*m.Value, 'f', 10, 64)
 		}
+	}
+	return result
+}
+
+func (ms *MemStorage) GetAllMetricsArr() []Metrics {
+	var result []Metrics
+	for _, m := range ms.metrics {
+		result = append(result, m)
 	}
 	return result
 }
