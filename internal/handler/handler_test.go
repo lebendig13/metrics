@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lebendig13/metrics/internal/config"
 	models "github.com/lebendig13/metrics/internal/model"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 
 func TestUpdateMetricHandler(t *testing.T) {
 	memStorage := models.NewMemStorage()
-	server := NewServer(memStorage)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
 	defer testServer.Close()
@@ -135,7 +136,7 @@ func TestGetMetricHandler(t *testing.T) {
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -211,7 +212,7 @@ func TestGetAllMetricsHandler(t *testing.T) {
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -245,7 +246,7 @@ func TestGetAllMetricsHandler(t *testing.T) {
 
 func TestUpdateMetricJSONHandler(t *testing.T) {
 	memStorage := models.NewMemStorage()
-	server := NewServer(memStorage)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
 	defer testServer.Close()
@@ -358,7 +359,7 @@ func TestValueJSONHandler(t *testing.T) {
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 

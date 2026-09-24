@@ -19,7 +19,8 @@ func main() {
 	configP := config.GetServerConfig()
 
 	memStorage := models.NewMemStorage()
-	server := handler.NewServer(memStorage)
+	server := handler.NewServer(memStorage, &configP)
+	handler.ProcessBackup(memStorage, &configP)
 
 	logger.Log.Info("Running server on", zap.String("address", configP.RunAddress))
 	err := http.ListenAndServe(configP.RunAddress, handler.MetricsRouter(server))

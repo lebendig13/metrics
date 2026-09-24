@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	"github.com/lebendig13/metrics/internal/config"
 	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
 )
@@ -36,15 +37,18 @@ type Storage interface {
 	InsertOrUpdate(m models.Metrics) error
 	Get(id string) (models.Metrics, bool)
 	GetAllMetrics() map[string]string
+	GetAllMetricsArr() []models.Metrics
 }
 
 type Server struct {
 	storage Storage
+	config  *config.ServerConfig
 }
 
-func NewServer(stg Storage) *Server {
+func NewServer(stg Storage, cnf *config.ServerConfig) *Server {
 	return &Server{
 		storage: stg,
+		config:  cnf,
 	}
 }
 
@@ -132,6 +136,8 @@ func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	s.SaveMetricsIfNecessary()
+
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 
@@ -190,6 +196,7 @@ func (s *Server) UpdateMetricHandler(res http.ResponseWriter, req *http.Request)
 		log.Println("Internal server error: cannot save metric to storage")
 		return
 	}
+	s.SaveMetricsIfNecessary()
 
 	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	res.WriteHeader(http.StatusOK)
@@ -269,5 +276,14 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 	if err := enc.Encode(metric); err != nil {
 		logger.Log.Error("error encoding response", zap.Error(err))
 		return
+	}
+}
+
+func (s *Server) SaveMetricsIfNecessary() {
+	if s.config.StoreInterval == 0 && s.config.FileStoragePath != "" {
+		currentMetrics := s.storage.GetAllMetricsArr()
+		if err := SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
+			logger.Log.Error("Failed to save metrics", zap.Error(err))
+		}
 	}
 }
