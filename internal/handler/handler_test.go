@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	models "github.com/lebendig13/metrics/internal/model"
@@ -49,7 +50,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 		{
 			name:   "no metric",
 			method: http.MethodPost,
-			path:   "/update",
+			path:   "/update//",
 			want: want{
 				code: http.StatusNotFound,
 			},
@@ -190,7 +191,6 @@ func TestGetMetricHandler(t *testing.T) {
 
 		resp, err := ts.Client().Do(request)
 		require.NoError(t, err)
-		defer resp.Body.Close()
 
 		assert.Equal(t, test.want.code, resp.StatusCode)
 
@@ -200,6 +200,8 @@ func TestGetMetricHandler(t *testing.T) {
 			assert.Equal(t, test.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, test.want.body, string(resBody))
 		}
+
+		defer resp.Body.Close()
 	}
 }
 
@@ -239,4 +241,190 @@ func TestGetAllMetricsHandler(t *testing.T) {
 	</body>
 	</html>`
 	assert.Equal(t, wantBody, string(resBody))
+}
+
+func TestUpdateMetricJSONHandler(t *testing.T) {
+	memStorage := models.NewMemStorage()
+	server := NewServer(memStorage)
+	router := MetricsRouter(server)
+	testServer := httptest.NewServer(router)
+	defer testServer.Close()
+
+	type want struct {
+		code        int
+		contentType string
+	}
+	tests := []struct {
+		name   string
+		method string
+		body   string
+		want   want
+	}{
+		{
+			name:   "success",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"counter", "delta":1}`,
+			want: want{
+				code:        http.StatusOK,
+				contentType: "application/json",
+			},
+		},
+		{
+			name:   "method not allowed",
+			method: http.MethodGet,
+			body:   `{"id":"PollCount", "type":"counter", "delta":1}`,
+			want: want{
+				code: http.StatusMethodNotAllowed,
+			},
+		},
+		{
+			name:   "no metric",
+			method: http.MethodPost,
+			body:   `{}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "bad type",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"unknown_type", "delta":1}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "no metric type",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "delta":1}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "empty metric name",
+			method: http.MethodPost,
+			body:   `{"id":"", "type":"counter", "delta":1}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "empty value",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"unknown_type"}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "bad counter value",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"unknown_type", "delta":"test"}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "bad gauge value",
+			method: http.MethodPost,
+			body:   `{"id":"Alloc", "type":"gauge", "value":"test"}`,
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+	}
+	testpath := "/update"
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, testpath, strings.NewReader(test.body))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			if test.want.code == http.StatusOK {
+				assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+			}
+		})
+	}
+}
+
+func TestValueJSONHandler(t *testing.T) {
+	memStorage := models.NewMemStorage()
+	dvalue := int64(1)
+	vvalue := 0.1
+	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	server := NewServer(memStorage)
+	ts := httptest.NewServer(MetricsRouter(server))
+	defer ts.Close()
+
+	type want struct {
+		code        int
+		contentType string
+		body        string
+	}
+	tests := []struct {
+		name   string
+		method string
+		body   string
+		want   want
+	}{
+		{
+			name:   "success",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"counter"}`,
+			want: want{
+				code:        http.StatusOK,
+				contentType: "application/json",
+				body:        `{"id":"PollCount","type":"counter","delta":1}`,
+			},
+		},
+		{
+			name:   "unknown metric type",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"counter_test"}`,
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+		{
+			name:   "unknown metric name",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount_test", "type":"counter"}`,
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+		{
+			name:   "incorrect metric type",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount", "type":"gauge"}`,
+			want: want{
+				code: http.StatusNotFound,
+			},
+		},
+	}
+	testpath := "/value"
+	for _, test := range tests {
+		request, err := http.NewRequest(test.method, ts.URL+testpath, strings.NewReader(test.body))
+		request.Header.Set("Content-Type", "application/json")
+		require.NoError(t, err)
+
+		resp, err := ts.Client().Do(request)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, test.want.code, resp.StatusCode)
+
+		if test.want.code == http.StatusOK {
+			resBody, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, test.want.contentType, resp.Header.Get("Content-Type"))
+			assert.Equal(t, test.want.body, strings.TrimSpace(string(resBody)))
+		}
+	}
 }

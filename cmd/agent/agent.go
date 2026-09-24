@@ -37,7 +37,7 @@ func NewAgentDefault() *Agent {
 
 func NewAgent(cnf *config.AgentConfig) *Agent {
 	return &Agent{
-		baseURL: fmt.Sprintf("http://%s/update/", cnf.ServerAddress),
+		baseURL: fmt.Sprintf("http://%s/update", cnf.ServerAddress),
 		intervals: Intervals{
 			PollInterval:   time.Duration(cnf.Intervals.PollInterval) * time.Second,
 			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,

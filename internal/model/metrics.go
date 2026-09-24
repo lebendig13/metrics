@@ -34,6 +34,9 @@ func NewMemStorage() *MemStorage {
 }
 
 func (ms *MemStorage) InsertOrUpdate(m Metrics) error {
+	if m.ID == "" {
+		return errors.New("empty metric ID")
+	}
 	switch m.MType {
 	case Counter:
 		if m.Delta == nil {

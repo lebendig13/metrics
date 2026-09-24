@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -26,10 +30,14 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) error
 		}
 		log.Printf("metricValue %s = %s\r\n", v.ID, metricValue)
 
-		url := baseURL + v.MType + "/" + v.ID + "/" + metricValue
-		err := SendUpdateRequest(client, url)
+		body, err := json.Marshal(v)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Cannot marshal metric %s = %s\r\n", v.ID, metricValue)
+			continue
+		}
+		res := SendUpdateWithJSONRequest(client, baseURL, bytes.NewReader(body))
+		if res != nil {
+			log.Println(res)
 			successRequestCounter--
 
 			if v.ID == "PollCount" {
@@ -61,4 +69,46 @@ func SendUpdateRequest(client *http.Client, url string) error {
 		return fmt.Errorf("got status %v for URL: %s", response.StatusCode, url)
 	}
 	return nil
+}
+
+func SendUpdateWithJSONRequest(client *http.Client, url string, body io.Reader) error {
+	compressedBody, err := CompressData(body)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, url, &compressedBody)
+	if err != nil {
+		return fmt.Errorf("cannot create request: %w. URL: %s", err, url)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("cannot send request: %w. URL: %s", err, url)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("got status %v for URL: %s", response.StatusCode, url)
+	}
+	return nil
+}
+
+func CompressData(data io.Reader) (bytes.Buffer, error) {
+	var compressedData bytes.Buffer
+	zw := gzip.NewWriter(&compressedData)
+
+	if _, err := io.Copy(zw, data); err != nil {
+		return compressedData, fmt.Errorf("cannot compress data: %w", err)
+	}
+
+	if err := zw.Close(); err != nil {
+		return compressedData, fmt.Errorf("cannot close gzip writer: %w", err)
+	}
+
+	return compressedData, nil
 }
