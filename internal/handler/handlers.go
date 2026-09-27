@@ -37,7 +37,7 @@ type Storage interface {
 	InsertOrUpdate(m models.Metrics) error
 	Get(id string) (models.Metrics, bool)
 	GetAllMetrics() map[string]string
-	GetAllMetricsArr() []models.Metrics
+	Snapshot() []models.Metrics
 }
 
 type Server struct {
@@ -281,7 +281,7 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 
 func (s *Server) SaveMetricsIfNecessary() {
 	if s.config.StoreInterval == 0 && s.config.FileStoragePath != "" {
-		currentMetrics := s.storage.GetAllMetricsArr()
+		currentMetrics := s.storage.Snapshot()
 		if err := SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
 			logger.Log.Error("Failed to save metrics", zap.Error(err))
 		}

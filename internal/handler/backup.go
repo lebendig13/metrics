@@ -94,7 +94,7 @@ func ProcessBackup(memStorage *models.MemStorage, cnf *config.ServerConfig) {
 		ticker := time.NewTicker(time.Duration(cnf.StoreInterval) * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			currentMetrics := memStorage.GetAllMetricsArr()
+			currentMetrics := memStorage.Snapshot()
 			err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
 			if err != nil {
 				logger.Log.Error("Cannot save current metrics", zap.Error(err))

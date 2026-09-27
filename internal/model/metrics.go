@@ -84,7 +84,7 @@ func (ms *MemStorage) GetAllMetrics() map[string]string {
 	return result
 }
 
-func (ms *MemStorage) GetAllMetricsArr() []Metrics {
+func (ms *MemStorage) Snapshot() []Metrics {
 	var result []Metrics
 	for _, m := range ms.metrics {
 		result = append(result, m)
