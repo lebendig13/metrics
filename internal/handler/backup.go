@@ -41,12 +41,8 @@ func RestoreMetrics(memStorage *models.MemStorage, fileStoragePath string) error
 }
 
 func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
-	if len(currentMetrics) == 0 {
-		return fmt.Errorf("cannot get current metrics")
-	}
-
 	dir := filepath.Dir(fpath)
-	if err := os.MkdirAll(dir, 0777); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("cannot create directories for path %s: %w", dir, err)
 	}
 
@@ -69,7 +65,7 @@ func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
 	}
 	buf.WriteString("]")
 
-	return os.WriteFile(fpath, buf.Bytes(), 0666)
+	return os.WriteFile(fpath, buf.Bytes(), 0644)
 }
 
 func ProcessBackup(memStorage *models.MemStorage, cnf *config.ServerConfig) {
