@@ -32,12 +32,12 @@ func SendMetrics(client *http.Client, m []*models.Metrics, baseURL string) error
 
 		body, err := json.Marshal(v)
 		if err != nil {
-			log.Printf("Cannot marshal metric %s = %s\r\n", v.ID, metricValue)
+			log.Printf("Cannot marshal metric %s = %s: %v\r\n", v.ID, metricValue, err)
 			continue
 		}
-		res := SendUpdateWithJSONRequest(client, baseURL, bytes.NewReader(body))
-		if res != nil {
-			log.Println(res)
+		err = SendUpdateWithJSONRequest(client, baseURL, bytes.NewReader(body))
+		if err != nil {
+			log.Println(err)
 			successRequestCounter--
 
 			if v.ID == "PollCount" {
