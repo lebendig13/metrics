@@ -25,14 +25,14 @@ func RestoreMetrics(memStorage *models.MemStorage, fileStoragePath string) error
 	}
 
 	var savedMetrics []models.Metrics
-	err1 := json.Unmarshal(data, &savedMetrics)
-	if err1 != nil {
+	err = json.Unmarshal(data, &savedMetrics)
+	if err != nil {
 		return fmt.Errorf("cannot unmarshal json metrics array: %w", err)
 	}
 
 	for _, m := range savedMetrics {
-		err2 := memStorage.InsertOrUpdate(m)
-		if err2 != nil {
+		err = memStorage.InsertOrUpdate(m)
+		if err != nil {
 			return fmt.Errorf("cannot restore metric %s to storage: %w", m.ID, err)
 		}
 	}
