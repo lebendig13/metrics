@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -46,14 +47,24 @@ func GetServerConfig() ServerConfig {
 	if envConfig.LogLevel != "" {
 		result.LogLevel = envConfig.LogLevel
 	}
-	if os.Getenv("STORE_INTERVAL") != "" {
-		result.StoreInterval = envConfig.StoreInterval
+	siEnv, siEnvExists := os.LookupEnv("STORE_INTERVAL")
+	if siEnvExists && siEnv != "" {
+		siEnvValue, err := strconv.Atoi(siEnv)
+		if err != nil {
+			log.Fatalf("Invalid STORE_INTERVAL value '%v': %v", siEnv, err)
+		}
+		result.StoreInterval = siEnvValue
 	}
 	if envConfig.FileStoragePath != "" {
 		result.FileStoragePath = envConfig.FileStoragePath
 	}
-	if envConfig.Restore {
-		result.Restore = envConfig.Restore
+	rEnv, rEnvExists := os.LookupEnv("RESTORE")
+	if rEnvExists && rEnv != "" {
+		rEnvValue, err := strconv.ParseBool(rEnv)
+		if err != nil {
+			log.Fatalf("Invalid RESTORE value '%v': %v", rEnv, err)
+		}
+		result.Restore = rEnvValue
 	}
 	return result
 }
@@ -75,11 +86,21 @@ func GetAgentConfig() AgentConfig {
 	if envConfig.ServerAddress != "" {
 		result.ServerAddress = envConfig.ServerAddress
 	}
-	if envConfig.Intervals.ReportInterval != 0 {
-		result.Intervals.ReportInterval = envConfig.Intervals.ReportInterval
+	riEnv, riEnvExists := os.LookupEnv("REPORT_INTERVAL")
+	if riEnvExists && riEnv != "" {
+		riEnvValue, err := strconv.Atoi(riEnv)
+		if err != nil {
+			log.Fatalf("Invalid REPORT_INTERVAL value '%v': %v", riEnv, err)
+		}
+		result.Intervals.ReportInterval = riEnvValue
 	}
-	if envConfig.Intervals.PollInterval != 0 {
-		result.Intervals.PollInterval = envConfig.Intervals.PollInterval
+	piEnv, piEnvExists := os.LookupEnv("POLL_INTERVAL")
+	if piEnvExists && piEnv != "" {
+		piEnvValue, err := strconv.Atoi(piEnv)
+		if err != nil {
+			log.Fatalf("Invalid POLL_INTERVAL value '%v': %v", piEnv, err)
+		}
+		result.Intervals.PollInterval = piEnvValue
 	}
 
 	log.Println("Server address: ", result.ServerAddress,
