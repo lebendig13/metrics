@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	models "github.com/lebendig13/metrics/internal/model"
 )
@@ -140,6 +141,7 @@ func TestSendUpdateWithJSONRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
+	defer server.Close()
 
 	client := &http.Client{}
 
@@ -151,12 +153,14 @@ func TestSendUpdateWithJSONRequest(t *testing.T) {
 	}{
 		{
 			name:     "invalid url with space",
-			urlValue: "http://local host:8080/update/gauge/testname/1",
+			urlValue: "http://local host:8080/update",
+			body:     `{"id":"Alloc","type":"gauge","value":0.1}`,
 			want:     "cannot create request",
 		},
 		{
 			name:     "invalid url with wrong address",
-			urlValue: "http://testlocalhost:8080/update/gauge/testname/1",
+			urlValue: "http://testlocalhost:8080/update",
+			body:     `{"id":"Alloc","type":"gauge","value":0.1}`,
 			want:     "cannot send request",
 		},
 		{
@@ -168,11 +172,9 @@ func TestSendUpdateWithJSONRequest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := SendUpdateRequest(client, test.urlValue)
-			log.Println("Actual error: ", err.Error())
+			err := SendUpdateWithJSONRequest(client, test.urlValue, strings.NewReader(test.body))
+			require.Error(t, err)
 			assert.Contains(t, err.Error(), test.want)
 		})
 	}
-
-	defer server.Close()
 }
