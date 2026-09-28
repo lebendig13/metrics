@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -68,7 +69,7 @@ func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
 	return os.WriteFile(fpath, buf.Bytes(), 0644)
 }
 
-func ProcessBackup(memStorage *models.MemStorage, cnf *config.ServerConfig) {
+func ProcessBackup(ctx context.Context, memStorage *models.MemStorage, cnf *config.ServerConfig) {
 	if cnf.FileStoragePath == "" {
 		logger.Log.Warn("Cannot backup metrics: empty file storage path")
 		return
@@ -93,11 +94,23 @@ func ProcessBackup(memStorage *models.MemStorage, cnf *config.ServerConfig) {
 	go func() {
 		ticker := time.NewTicker(time.Duration(cnf.StoreInterval) * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			currentMetrics := memStorage.Snapshot()
-			err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
-			if err != nil {
-				logger.Log.Error("Cannot save current metrics", zap.Error(err))
+
+		for {
+			select {
+			case <-ticker.C:
+				currentMetrics := memStorage.Snapshot()
+				err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
+				if err != nil {
+					logger.Log.Error("Cannot save current metrics", zap.Error(err))
+				}
+			case <-ctx.Done():
+				logger.Log.Info("Saving current metrics before shutdown...")
+				currentMetrics := memStorage.Snapshot()
+				err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
+				if err != nil {
+					logger.Log.Error("Cannot save current metrics", zap.Error(err))
+				}
+				return
 			}
 		}
 	}()
