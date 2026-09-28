@@ -47,6 +47,20 @@ func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
 		return fmt.Errorf("cannot create directories for path %s: %w", dir, err)
 	}
 
+	tmpFile, err := os.CreateTemp(dir, "metrics_values_*.tmp")
+	if err != nil {
+		return fmt.Errorf("cannot create temporary file: %w", err)
+	}
+
+	// если запись не удалась, нужно удалить временный файл
+	var success bool
+	defer func() {
+		_ = tmpFile.Close()
+		if !success {
+			_ = os.Remove(tmpFile.Name())
+		}
+	}()
+
 	var buf bytes.Buffer
 	buf.WriteString("[\n")
 	for i, metric := range currentMetrics {
@@ -66,7 +80,28 @@ func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
 	}
 	buf.WriteString("]")
 
-	return os.WriteFile(fpath, buf.Bytes(), 0644)
+	if _, err := tmpFile.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("cannot write to temporary file: %w", err)
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("cannot sync temporary file to disk: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("cannot close temporary file: %w", err)
+	}
+
+	if err := os.Rename(tmpFile.Name(), fpath); err != nil {
+		return fmt.Errorf("cannot replace metrics values file: %w", err)
+	}
+
+	if err := os.Chmod(fpath, 0644); err != nil {
+		return fmt.Errorf("cannot set 0644 permissions on metrics values file: %w", err)
+	}
+
+	success = true
+	return nil
 }
 
 func ProcessBackup(ctx context.Context, memStorage *models.MemStorage, cnf *config.ServerConfig) {
