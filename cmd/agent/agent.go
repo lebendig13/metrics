@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"time"
 
+	handler "github.com/lebendig13/metrics/internal/agent"
 	config "github.com/lebendig13/metrics/internal/config"
-	handler "github.com/lebendig13/metrics/internal/handler"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 

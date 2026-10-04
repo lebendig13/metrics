@@ -8,9 +8,9 @@ import (
 	"go.uber.org/zap"
 
 	config "github.com/lebendig13/metrics/internal/config"
-	handler "github.com/lebendig13/metrics/internal/handler"
 	logger "github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
+	handler "github.com/lebendig13/metrics/internal/server"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-package handler
+package internal_server
 
 import (
 	"io"
