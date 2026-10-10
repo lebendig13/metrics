@@ -1,4 +1,4 @@
-package internal_server
+package server
 
 import (
 	"encoding/json"

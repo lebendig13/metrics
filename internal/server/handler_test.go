@@ -1,4 +1,4 @@
-package internal_server
+package server
 
 import (
 	"errors"
@@ -488,7 +488,7 @@ func TestPingDB(t *testing.T) {
 			name:   "no database",
 			method: http.MethodGet,
 			mockOption: func(m *mocks.MockDBConnection) {
-				m.EXPECT().CheckDBConnection().Return(errors.New("No database")).Times(1)
+				m.EXPECT().CheckDBConnection().Return(errors.New("no database")).Times(1)
 			},
 			want: want{
 				code: http.StatusInternalServerError,

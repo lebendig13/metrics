@@ -1,4 +1,4 @@
-package internal_agent
+package agent
 
 import (
 	"bytes"

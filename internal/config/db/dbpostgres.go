@@ -31,12 +31,6 @@ func InitDBConnection(databaseDSN string) (*SQLDB, error) {
 	}
 
 	sqldb := &SQLDB{db: db}
-	/*
-		if err := sqldb.CheckDBConnection(); err != nil {
-			db.Close()
-			return nil, err
-		}
-	*/
 	return sqldb, nil
 }
 
@@ -45,7 +39,7 @@ func (d *SQLDB) CheckDBConnection() error {
 	defer cancel()
 
 	if d.db == nil {
-		return fmt.Errorf("No database")
+		return fmt.Errorf("no database")
 	}
 
 	if err := d.db.PingContext(ctx); err != nil {
