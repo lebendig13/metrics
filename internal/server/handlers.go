@@ -1,4 +1,4 @@
-package handler
+package server
 
 import (
 	"encoding/json"
@@ -40,15 +40,21 @@ type Storage interface {
 	Snapshot() []models.Metrics
 }
 
+type DBConnection interface {
+	CheckDBConnection() error
+}
+
 type Server struct {
 	storage Storage
 	config  *config.ServerConfig
+	sqldb   DBConnection
 }
 
-func NewServer(stg Storage, cnf *config.ServerConfig) *Server {
+func NewServer(stg Storage, cnf *config.ServerConfig, db DBConnection) *Server {
 	return &Server{
 		storage: stg,
 		config:  cnf,
+		sqldb:   db,
 	}
 }
 
@@ -56,6 +62,7 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
+	router.Get("/ping", server.PingDB)
 	router.Post("/update", server.UpdateMetricJSONHandler)
 	router.Post("/update/", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
@@ -286,4 +293,14 @@ func (s *Server) SaveMetricsIfNecessary() {
 			logger.Log.Error("Failed to save metrics", zap.Error(err))
 		}
 	}
+}
+
+func (s *Server) PingDB(res http.ResponseWriter, req *http.Request) {
+	if err := s.sqldb.CheckDBConnection(); err != nil {
+		logger.Log.Error("Check DB connection failed, ", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
 }

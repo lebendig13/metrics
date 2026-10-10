@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -15,6 +16,7 @@ type ServerConfig struct {
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         bool   `env:"RESTORE"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
 type AgentConfigIntervals struct {
@@ -34,12 +36,13 @@ func GetServerConfig() ServerConfig {
 	flag.IntVar(&result.StoreInterval, "i", 300, "store interval")
 	flag.StringVar(&result.FileStoragePath, "f", "/home/user/metrics/metrics_values.txt", "file storage path")
 	flag.BoolVar(&result.Restore, "r", false, "restore saved metrics when server starts")
+	flag.StringVar(&result.DatabaseDSN, "d", fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metricsuser`, `metricsuser`, `metrics`), "database connection string")
 	flag.Parse()
 
 	var envConfig ServerConfig
 	err := env.Parse(&envConfig)
 	if err != nil {
-		log.Fatal("Cannot get environment variables \"ADDRESS\", \"LOG_LEVEL\", \"STORE_INTERVAL\", \"FILE_STORAGE_PATH\", \"RESTORE\": ", err)
+		log.Fatal("Cannot get environment variables \"ADDRESS\", \"LOG_LEVEL\", \"STORE_INTERVAL\", \"FILE_STORAGE_PATH\", \"RESTORE\", \"DATABASE_DSN\": ", err)
 	}
 	if envConfig.RunAddress != "" {
 		result.RunAddress = envConfig.RunAddress
@@ -65,6 +68,9 @@ func GetServerConfig() ServerConfig {
 			log.Fatalf("Invalid RESTORE value '%v': %v", rEnv, err)
 		}
 		result.Restore = rEnvValue
+	}
+	if envConfig.DatabaseDSN != "" {
+		result.DatabaseDSN = envConfig.DatabaseDSN
 	}
 	return result
 }
