@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lebendig13/metrics/internal/logger"
 )
 
 type SQLDB struct {
@@ -14,6 +15,11 @@ type SQLDB struct {
 }
 
 func InitDBConnection(databaseDSN string) (*SQLDB, error) {
+	if databaseDSN == "" {
+		logger.Log.Info("Database DSN is empty")
+		return nil, nil
+	}
+
 	db, err := sql.Open("pgx", databaseDSN)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open database: %w", err)
