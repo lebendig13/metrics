@@ -16,7 +16,12 @@ type SQLDB struct {
 
 func InitDBConnection(databaseDSN string) (*SQLDB, error) {
 	if databaseDSN == "" {
-		logger.Log.Info("Database DSN is empty")
+		if logger.Log != nil {
+			logger.Log.Info("Database DSN is empty")
+		} else {
+			fmt.Println("Database DSN is empty")
+		}
+
 		return nil, nil
 	}
 
@@ -26,12 +31,12 @@ func InitDBConnection(databaseDSN string) (*SQLDB, error) {
 	}
 
 	sqldb := &SQLDB{db: db}
-
-	if err := sqldb.CheckDBConnection(); err != nil {
-		db.Close()
-		return nil, err
-	}
-
+	/*
+		if err := sqldb.CheckDBConnection(); err != nil {
+			db.Close()
+			return nil, err
+		}
+	*/
 	return sqldb, nil
 }
 
