@@ -24,7 +24,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Database error: ", err)
 	}
-	defer sqldb.Close()
+	if sqldb != nil {
+		defer sqldb.Close()
+	}
 
 	memStorage := models.NewMemStorage()
 	server := handler.NewServer(memStorage, &configP, sqldb)
