@@ -1,4 +1,4 @@
-package server
+package repository
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func RestoreMetrics(memStorage *models.MemStorage, fileStoragePath string) error {
+func RestoreMetrics(memStorage *MemStorage, fileStoragePath string) error {
 	data, err := os.ReadFile(fileStoragePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -104,7 +104,7 @@ func SaveMetrics(currentMetrics []models.Metrics, fpath string) error {
 	return nil
 }
 
-func ProcessBackup(ctx context.Context, memStorage *models.MemStorage, cnf *config.ServerConfig) {
+func ProcessBackup(ctx context.Context, memStorage *MemStorage, cnf *config.ServerConfig) {
 	if cnf.FileStoragePath == "" {
 		logger.Log.Warn("Cannot backup metrics: empty file storage path")
 		return
@@ -139,12 +139,7 @@ func ProcessBackup(ctx context.Context, memStorage *models.MemStorage, cnf *conf
 					logger.Log.Error("Cannot save current metrics", zap.Error(err))
 				}
 			case <-ctx.Done():
-				logger.Log.Info("Saving current metrics before shutdown...")
-				currentMetrics := memStorage.Snapshot()
-				err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
-				if err != nil {
-					logger.Log.Error("Cannot save current metrics", zap.Error(err))
-				}
+				logger.Log.Info("Stop background backup")
 				return
 			}
 		}

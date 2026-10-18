@@ -8,9 +8,9 @@ import (
 	"go.uber.org/zap"
 
 	config "github.com/lebendig13/metrics/internal/config"
-	db "github.com/lebendig13/metrics/internal/config/db"
 	logger "github.com/lebendig13/metrics/internal/logger"
-	models "github.com/lebendig13/metrics/internal/model"
+	dbmigration "github.com/lebendig13/metrics/internal/migrate"
+	repository "github.com/lebendig13/metrics/internal/repository"
 	handler "github.com/lebendig13/metrics/internal/server"
 )
 
@@ -19,21 +19,27 @@ func main() {
 		log.Fatal("Cannot initialize logger: ", err)
 	}
 	configP := config.GetServerConfig()
-
-	sqldb, err := db.InitDBConnection(configP.DatabaseDSN)
-	if err != nil {
-		log.Fatal("Database error: ", err)
+	if configP.DatabaseDSN != "" {
+		if err := dbmigration.Up(configP.DatabaseDSN); err != nil {
+			log.Fatal("Failed to migrate database: ", err)
+		}
 	}
-	if sqldb != nil {
-		defer sqldb.Close()
-	}
-
-	memStorage := models.NewMemStorage()
-	server := handler.NewServer(memStorage, &configP, sqldb)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	handler.ProcessBackup(ctx, memStorage, &configP)
+	storage, err := repository.NewStorage(ctx, &configP)
+	if err != nil {
+		log.Fatal("Cannot initialize storage: ", err)
+	}
+	defer func() {
+		if err := storage.Close(); err != nil {
+			logger.Log.Error("Failed to close storage", zap.Error(err))
+		} else {
+			logger.Log.Info("Storage closed successfully")
+		}
+	}()
+
+	server := handler.NewServer(storage, &configP)
 
 	logger.Log.Info("Running server on", zap.String("address", configP.RunAddress))
 	err = http.ListenAndServe(configP.RunAddress, handler.MetricsRouter(server))

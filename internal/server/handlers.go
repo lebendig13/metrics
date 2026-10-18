@@ -17,6 +17,7 @@ import (
 	"github.com/lebendig13/metrics/internal/config"
 	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
+	"github.com/lebendig13/metrics/internal/repository"
 )
 
 const (
@@ -33,28 +34,15 @@ const (
 	</html>`
 )
 
-type Storage interface {
-	InsertOrUpdate(m models.Metrics) error
-	Get(id string) (models.Metrics, bool)
-	GetAllMetrics() map[string]string
-	Snapshot() []models.Metrics
-}
-
-type DBConnection interface {
-	CheckDBConnection() error
-}
-
 type Server struct {
-	storage Storage
+	storage repository.Storage
 	config  *config.ServerConfig
-	sqldb   DBConnection
 }
 
-func NewServer(stg Storage, cnf *config.ServerConfig, db DBConnection) *Server {
+func NewServer(stg repository.Storage, cnf *config.ServerConfig) *Server {
 	return &Server{
 		storage: stg,
 		config:  cnf,
-		sqldb:   db,
 	}
 }
 
@@ -289,14 +277,27 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 func (s *Server) SaveMetricsIfNecessary() {
 	if s.config.StoreInterval == 0 && s.config.FileStoragePath != "" {
 		currentMetrics := s.storage.Snapshot()
-		if err := SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
+		if err := repository.SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
 			logger.Log.Error("Failed to save metrics", zap.Error(err))
 		}
 	}
 }
 
 func (s *Server) PingDB(res http.ResponseWriter, req *http.Request) {
-	if err := s.sqldb.CheckDBConnection(); err != nil {
+	if s.storage == nil {
+		logger.Log.Error("No storage")
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	dbst, ok := s.storage.(repository.Pingable)
+	if !ok {
+		logger.Log.Error("No DBStorage")
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := dbst.CheckDBConnection(); err != nil {
 		logger.Log.Error("Check DB connection failed, ", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return

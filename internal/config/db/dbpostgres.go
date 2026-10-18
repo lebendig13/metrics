@@ -10,6 +10,10 @@ import (
 	"github.com/lebendig13/metrics/internal/logger"
 )
 
+type DBConnection interface {
+	CheckDBConnection() error
+}
+
 type SQLDB struct {
 	db *sql.DB
 }
@@ -53,4 +57,25 @@ func (d *SQLDB) Close() error {
 		return d.db.Close()
 	}
 	return nil
+}
+
+func (d *SQLDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if d.db == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
+	}
+	return d.db.ExecContext(ctx, query, args...)
+}
+
+func (d *SQLDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if d.db == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
+	}
+	return d.db.QueryContext(ctx, query, args...)
+}
+
+func (d *SQLDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	if d.db == nil {
+		return &sql.Row{}
+	}
+	return d.db.QueryRowContext(ctx, query, args...)
 }

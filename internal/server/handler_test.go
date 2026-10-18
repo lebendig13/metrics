@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -14,10 +15,20 @@ import (
 	"github.com/lebendig13/metrics/internal/logger"
 	"github.com/lebendig13/metrics/internal/mocks"
 	models "github.com/lebendig13/metrics/internal/model"
+	"github.com/lebendig13/metrics/internal/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type testStorageWrapper struct {
+	*mocks.MockStorage
+	*mocks.MockDBConnection
+}
+
+func (w testStorageWrapper) Close() error {
+	return nil
+}
 
 // Настройка логгера для тестов сделана по подсказке ИИ
 func TestMain(m *testing.M) {
@@ -29,12 +40,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestUpdateMetricHandler(t *testing.T) {
-	mockctrl := gomock.NewController(t)
-	defer mockctrl.Finish()
-	mockDB := mocks.NewMockDBConnection(mockctrl)
+	ctx := context.Background()
+	configP := config.ServerConfig{}
 
-	memStorage := models.NewMemStorage()
-	server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
 	defer testServer.Close()
@@ -149,16 +160,16 @@ func TestUpdateMetricHandler(t *testing.T) {
 }
 
 func TestGetMetricHandler(t *testing.T) {
-	mockctrl := gomock.NewController(t)
-	defer mockctrl.Finish()
-	mockDB := mocks.NewMockDBConnection(mockctrl)
+	ctx := context.Background()
+	configP := config.ServerConfig{}
 
-	memStorage := models.NewMemStorage()
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -229,16 +240,16 @@ func TestGetMetricHandler(t *testing.T) {
 }
 
 func TestGetAllMetricsHandler(t *testing.T) {
-	mockctrl := gomock.NewController(t)
-	defer mockctrl.Finish()
-	mockDB := mocks.NewMockDBConnection(mockctrl)
+	ctx := context.Background()
+	configP := config.ServerConfig{}
 
-	memStorage := models.NewMemStorage()
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -271,12 +282,12 @@ func TestGetAllMetricsHandler(t *testing.T) {
 }
 
 func TestUpdateMetricJSONHandler(t *testing.T) {
-	mockctrl := gomock.NewController(t)
-	defer mockctrl.Finish()
-	mockDB := mocks.NewMockDBConnection(mockctrl)
+	ctx := context.Background()
+	configP := config.ServerConfig{}
 
-	memStorage := models.NewMemStorage()
-	server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
+	server := NewServer(memStorage, &configP)
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
 	defer testServer.Close()
@@ -384,16 +395,16 @@ func TestUpdateMetricJSONHandler(t *testing.T) {
 }
 
 func TestValueJSONHandler(t *testing.T) {
-	mockctrl := gomock.NewController(t)
-	defer mockctrl.Finish()
-	mockDB := mocks.NewMockDBConnection(mockctrl)
+	ctx := context.Background()
+	configP := config.ServerConfig{}
 
-	memStorage := models.NewMemStorage()
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
 	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
 	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -507,12 +518,22 @@ func TestPingDB(t *testing.T) {
 		defer mockctrl.Finish()
 
 		mockDB := mocks.NewMockDBConnection(mockctrl)
+		mockStorageMethods := mocks.NewMockStorage(mockctrl)
+
 		if test.mockOption != nil {
 			test.mockOption(mockDB)
 		}
 
-		memStorage := models.NewMemStorage()
-		server := NewServer(memStorage, &config.ServerConfig{}, mockDB)
+		wrapper := testStorageWrapper{
+			MockStorage:      mockStorageMethods,
+			MockDBConnection: mockDB,
+		}
+
+		configP := config.ServerConfig{
+			DatabaseDSN: "dsn",
+		}
+
+		server := NewServer(wrapper, &configP)
 		ts := httptest.NewServer(MetricsRouter(server))
 		defer ts.Close()
 
