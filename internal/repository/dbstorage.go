@@ -153,6 +153,10 @@ func (dbs *DBStorage) Snapshot() []models.Metrics {
 		result = append(result, m)
 	}
 
+	if err := rows.Err(); err != nil {
+		return result
+	}
+
 	return result
 }
 
