@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"github.com/lebendig13/metrics/internal/config"
 	models "github.com/lebendig13/metrics/internal/model"
@@ -16,9 +17,9 @@ type Storage interface {
 }
 
 func NewStorage(ctx context.Context, configP *config.ServerConfig) (Storage, error) {
-	if configP.DatabaseDSN == "" {
-		return NewMemStorage(ctx, configP)
+	if configP.DatabaseDSN != "" && strings.HasPrefix(configP.DatabaseDSN, "postgres://") {
+		return NewDBStorage(configP.DatabaseDSN)
 	}
 
-	return NewDBStorage(configP.DatabaseDSN)
+	return NewMemStorage(ctx, configP)
 }
