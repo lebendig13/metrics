@@ -31,6 +31,11 @@ func (ms *MemStorage) InsertOrUpdate(m models.Metrics) error {
 	if m.ID == "" {
 		return errors.New("empty metric ID")
 	}
+
+	if ms.metrics == nil {
+		ms.metrics = make(map[string]models.Metrics)
+	}
+
 	switch m.MType {
 	case models.Counter:
 		if m.Delta == nil {
