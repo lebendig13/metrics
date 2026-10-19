@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -19,7 +20,7 @@ func main() {
 		log.Fatal("Cannot initialize logger: ", err)
 	}
 	configP := config.GetServerConfig()
-	if configP.DatabaseDSN != "" {
+	if configP.DatabaseDSN != "" && strings.HasPrefix(configP.DatabaseDSN, "postgres://") {
 		if err := dbmigration.Up(configP.DatabaseDSN); err != nil {
 			log.Fatal("Failed to migrate database: ", err)
 		}
