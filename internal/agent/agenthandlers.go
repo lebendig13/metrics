@@ -116,12 +116,12 @@ func CompressData(data io.Reader) (bytes.Buffer, error) {
 func SendMetricsBatch(client *http.Client, m []*models.Metrics, baseURL string) error {
 	body, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("Cannot marshal metrics: %v", err)
+		return fmt.Errorf("cannot marshal metrics: %v", err)
 	}
 
 	compressedBody, err := CompressData(bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("Cannot compress body: %v", err)
+		return fmt.Errorf("cannot compress body: %v", err)
 	}
 
 	request, err := http.NewRequest(http.MethodPost, baseURL, &compressedBody)
