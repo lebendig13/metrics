@@ -79,3 +79,10 @@ func (d *SQLDB) QueryRowContext(ctx context.Context, query string, args ...any) 
 	}
 	return d.db.QueryRowContext(ctx, query, args...)
 }
+
+func (d *SQLDB) BeginTx(ctx context.Context) (*sql.Tx, error) {
+	if d.db == nil {
+		return &sql.Tx{}, fmt.Errorf("nil db")
+	}
+	return d.db.BeginTx(ctx, nil)
+}

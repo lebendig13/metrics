@@ -34,6 +34,20 @@ func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method.
+func (m *MockStorage) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockStorageMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStorage)(nil).Close))
+}
+
 // Get mocks base method.
 func (m *MockStorage) Get(id string) (models.Metrics, bool) {
 	m.ctrl.T.Helper()
@@ -89,4 +103,18 @@ func (m *MockStorage) Snapshot() []models.Metrics {
 func (mr *MockStorageMockRecorder) Snapshot() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*MockStorage)(nil).Snapshot))
+}
+
+// UpdateMetricsBatch mocks base method.
+func (m *MockStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateMetricsBatch", metrics)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateMetricsBatch indicates an expected call of UpdateMetricsBatch.
+func (mr *MockStorageMockRecorder) UpdateMetricsBatch(metrics interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMetricsBatch", reflect.TypeOf((*MockStorage)(nil).UpdateMetricsBatch), metrics)
 }

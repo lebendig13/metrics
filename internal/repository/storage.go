@@ -10,6 +10,7 @@ import (
 
 type Storage interface {
 	InsertOrUpdate(m models.Metrics) error
+	UpdateMetricsBatch(metrics []models.Metrics) error
 	Get(id string) (models.Metrics, bool)
 	GetAllMetrics() map[string]string
 	Snapshot() []models.Metrics

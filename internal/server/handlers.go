@@ -51,6 +51,7 @@ func MetricsRouter(server *Server) chi.Router {
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
 	router.Get("/ping", server.PingDB)
+	router.Post("/updates/", server.UpdateMetricsBatchHandler)
 	router.Post("/update", server.UpdateMetricJSONHandler)
 	router.Post("/update/", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
@@ -113,6 +114,38 @@ func GzipMiddleware(h http.Handler) http.Handler {
 
 		h.ServeHTTP(ow, r)
 	})
+}
+
+func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
+	var reqmetrics []models.Metrics
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&reqmetrics); err != nil {
+		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, reqm := range reqmetrics {
+		if reqm.MType != models.Counter && reqm.MType != models.Gauge {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	err := s.storage.UpdateMetricsBatch(reqmetrics)
+	if err != nil {
+		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	if err := enc.Encode(&reqmetrics); err != nil {
+		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+	}
 }
 
 func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {

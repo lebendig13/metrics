@@ -57,6 +57,40 @@ func (dbs *DBStorage) InsertOrUpdate(m models.Metrics) error {
 	return nil
 }
 
+func (dbs *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	ctx := context.TODO()
+	tx, err := dbs.sqldb.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, m := range metrics {
+		if m.ID == "" {
+			return errors.New("empty metric ID")
+		}
+
+		query := `
+		INSERT INTO metrics (id, type, delta, value)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id, type) 
+		DO UPDATE SET 
+			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE EXCLUDED.delta END,
+			value = CASE WHEN metrics.type = 'gauge' THEN EXCLUDED.value ELSE EXCLUDED.value END;
+	`
+		_, err := dbs.sqldb.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value)
+		if err != nil {
+			return fmt.Errorf("failed to insert or update metric %s: %w", m.ID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (dbs *DBStorage) Get(id string) (models.Metrics, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

@@ -112,3 +112,35 @@ func CompressData(data io.Reader) (bytes.Buffer, error) {
 
 	return compressedData, nil
 }
+
+func SendMetricsBatch(client *http.Client, m []*models.Metrics, baseURL string) error {
+	body, err := json.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("Cannot marshal metrics: %v", err)
+	}
+
+	compressedBody, err := CompressData(bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("Cannot compress body: %v", err)
+	}
+
+	request, err := http.NewRequest(http.MethodPost, baseURL, &compressedBody)
+	if err != nil {
+		return fmt.Errorf("cannot create request: %w. URL: %s", err, baseURL)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("cannot send request: %w. URL: %s", err, baseURL)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("got status %v for URL: %s", response.StatusCode, baseURL)
+	}
+	return nil
+}
