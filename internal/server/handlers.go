@@ -1,4 +1,4 @@
-package handler
+package server
 
 import (
 	"encoding/json"
@@ -17,6 +17,7 @@ import (
 	"github.com/lebendig13/metrics/internal/config"
 	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
+	"github.com/lebendig13/metrics/internal/repository"
 )
 
 const (
@@ -33,19 +34,12 @@ const (
 	</html>`
 )
 
-type Storage interface {
-	InsertOrUpdate(m models.Metrics) error
-	Get(id string) (models.Metrics, bool)
-	GetAllMetrics() map[string]string
-	Snapshot() []models.Metrics
-}
-
 type Server struct {
-	storage Storage
+	storage repository.Storage
 	config  *config.ServerConfig
 }
 
-func NewServer(stg Storage, cnf *config.ServerConfig) *Server {
+func NewServer(stg repository.Storage, cnf *config.ServerConfig) *Server {
 	return &Server{
 		storage: stg,
 		config:  cnf,
@@ -56,6 +50,8 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
+	router.Get("/ping", server.PingDB)
+	router.Post("/updates/", server.UpdateMetricsBatchHandler)
 	router.Post("/update", server.UpdateMetricJSONHandler)
 	router.Post("/update/", server.UpdateMetricJSONHandler)
 	router.Post("/update/{metric_type}/{metric_name}/{metric_value}", server.UpdateMetricHandler)
@@ -118,6 +114,38 @@ func GzipMiddleware(h http.Handler) http.Handler {
 
 		h.ServeHTTP(ow, r)
 	})
+}
+
+func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
+	var reqmetrics []models.Metrics
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&reqmetrics); err != nil {
+		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, reqm := range reqmetrics {
+		if reqm.MType != models.Counter && reqm.MType != models.Gauge {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	err := s.storage.UpdateMetricsBatch(reqmetrics)
+	if err != nil {
+		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	if err := enc.Encode(&reqmetrics); err != nil {
+		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+	}
 }
 
 func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
@@ -282,8 +310,31 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 func (s *Server) SaveMetricsIfNecessary() {
 	if s.config.StoreInterval == 0 && s.config.FileStoragePath != "" {
 		currentMetrics := s.storage.Snapshot()
-		if err := SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
+		if err := repository.SaveMetrics(currentMetrics, s.config.FileStoragePath); err != nil {
 			logger.Log.Error("Failed to save metrics", zap.Error(err))
 		}
 	}
+}
+
+func (s *Server) PingDB(res http.ResponseWriter, req *http.Request) {
+	if s.storage == nil {
+		logger.Log.Error("No storage")
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	dbst, ok := s.storage.(repository.Pingable)
+	if !ok {
+		logger.Log.Error("No DBStorage")
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := dbst.CheckDBConnection(); err != nil {
+		logger.Log.Error("Check DB connection failed, ", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
 }

@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"time"
 
+	handler "github.com/lebendig13/metrics/internal/agent"
 	config "github.com/lebendig13/metrics/internal/config"
-	handler "github.com/lebendig13/metrics/internal/handler"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
@@ -26,7 +26,7 @@ type Agent struct {
 
 func NewAgentDefault() *Agent {
 	return &Agent{
-		baseURL: "http://localhost:8080/update/",
+		baseURL: "http://localhost:8080/updates/",
 		intervals: Intervals{
 			PollInterval:   time.Duration(2) * time.Second,
 			ReportInterval: time.Duration(10) * time.Second,
@@ -37,7 +37,7 @@ func NewAgentDefault() *Agent {
 
 func NewAgent(cnf *config.AgentConfig) *Agent {
 	return &Agent{
-		baseURL: fmt.Sprintf("http://%s/update", cnf.ServerAddress),
+		baseURL: fmt.Sprintf("http://%s/updates/", cnf.ServerAddress),
 		intervals: Intervals{
 			PollInterval:   time.Duration(cnf.Intervals.PollInterval) * time.Second,
 			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,
@@ -64,7 +64,7 @@ func (a *Agent) Process() {
 		timeSinceLastReport += a.intervals.PollInterval
 		if timeSinceLastReport >= a.intervals.ReportInterval {
 			log.Println("Start sending metrics to server")
-			err := handler.SendMetrics(client, currentMetrics, a.baseURL)
+			err := handler.SendMetricsBatch(client, currentMetrics, a.baseURL)
 			if err == nil {
 				a.pollCount = 0
 			} else {
