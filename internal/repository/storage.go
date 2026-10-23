@@ -9,12 +9,12 @@ import (
 )
 
 type Storage interface {
-	InsertOrUpdate(m models.Metrics) error
-	UpdateMetricsBatch(metrics []models.Metrics) error
-	Get(id string) (models.Metrics, bool)
-	GetAllMetrics() map[string]string
-	Snapshot() []models.Metrics
-	Close() error
+	InsertOrUpdate(ctx context.Context, m models.Metrics) error
+	UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error
+	Get(ctx context.Context, id string) (models.Metrics, bool)
+	GetAllMetrics(ctx context.Context) map[string]string
+	Snapshot(ctx context.Context) []models.Metrics
+	Close(ctx context.Context) error
 }
 
 func NewStorage(ctx context.Context, configP *config.ServerConfig) (Storage, error) {

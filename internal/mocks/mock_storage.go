@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -35,86 +36,86 @@ func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 }
 
 // Close mocks base method.
-func (m *MockStorage) Close() error {
+func (m *MockStorage) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
+	ret := m.ctrl.Call(m, "Close", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockStorageMockRecorder) Close() *gomock.Call {
+func (mr *MockStorageMockRecorder) Close(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStorage)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStorage)(nil).Close), ctx)
 }
 
 // Get mocks base method.
-func (m *MockStorage) Get(id string) (models.Metrics, bool) {
+func (m *MockStorage) Get(ctx context.Context, id string) (models.Metrics, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", id)
+	ret := m.ctrl.Call(m, "Get", ctx, id)
 	ret0, _ := ret[0].(models.Metrics)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockStorageMockRecorder) Get(id interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) Get(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockStorage)(nil).Get), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockStorage)(nil).Get), ctx, id)
 }
 
 // GetAllMetrics mocks base method.
-func (m *MockStorage) GetAllMetrics() map[string]string {
+func (m *MockStorage) GetAllMetrics(ctx context.Context) map[string]string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAllMetrics")
+	ret := m.ctrl.Call(m, "GetAllMetrics", ctx)
 	ret0, _ := ret[0].(map[string]string)
 	return ret0
 }
 
 // GetAllMetrics indicates an expected call of GetAllMetrics.
-func (mr *MockStorageMockRecorder) GetAllMetrics() *gomock.Call {
+func (mr *MockStorageMockRecorder) GetAllMetrics(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllMetrics", reflect.TypeOf((*MockStorage)(nil).GetAllMetrics))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllMetrics", reflect.TypeOf((*MockStorage)(nil).GetAllMetrics), ctx)
 }
 
 // InsertOrUpdate mocks base method.
-func (m_2 *MockStorage) InsertOrUpdate(m models.Metrics) error {
+func (m_2 *MockStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) error {
 	m_2.ctrl.T.Helper()
-	ret := m_2.ctrl.Call(m_2, "InsertOrUpdate", m)
+	ret := m_2.ctrl.Call(m_2, "InsertOrUpdate", ctx, m)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // InsertOrUpdate indicates an expected call of InsertOrUpdate.
-func (mr *MockStorageMockRecorder) InsertOrUpdate(m interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) InsertOrUpdate(ctx, m interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOrUpdate", reflect.TypeOf((*MockStorage)(nil).InsertOrUpdate), m)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOrUpdate", reflect.TypeOf((*MockStorage)(nil).InsertOrUpdate), ctx, m)
 }
 
 // Snapshot mocks base method.
-func (m *MockStorage) Snapshot() []models.Metrics {
+func (m *MockStorage) Snapshot(ctx context.Context) []models.Metrics {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Snapshot")
+	ret := m.ctrl.Call(m, "Snapshot", ctx)
 	ret0, _ := ret[0].([]models.Metrics)
 	return ret0
 }
 
 // Snapshot indicates an expected call of Snapshot.
-func (mr *MockStorageMockRecorder) Snapshot() *gomock.Call {
+func (mr *MockStorageMockRecorder) Snapshot(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*MockStorage)(nil).Snapshot))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*MockStorage)(nil).Snapshot), ctx)
 }
 
 // UpdateMetricsBatch mocks base method.
-func (m *MockStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (m *MockStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateMetricsBatch", metrics)
+	ret := m.ctrl.Call(m, "UpdateMetricsBatch", ctx, metrics)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateMetricsBatch indicates an expected call of UpdateMetricsBatch.
-func (mr *MockStorageMockRecorder) UpdateMetricsBatch(metrics interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) UpdateMetricsBatch(ctx, metrics interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMetricsBatch", reflect.TypeOf((*MockStorage)(nil).UpdateMetricsBatch), metrics)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMetricsBatch", reflect.TypeOf((*MockStorage)(nil).UpdateMetricsBatch), ctx, metrics)
 }

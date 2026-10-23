@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -49,7 +50,7 @@ func NewAgent(cnf *config.AgentConfig) *Agent {
 func (a *Agent) Process() {
 	log.Println("Agent started")
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	rng := rand.New(rand.NewSource((time.Now().UnixNano())))
@@ -64,13 +65,15 @@ func (a *Agent) Process() {
 		timeSinceLastReport += a.intervals.PollInterval
 		if timeSinceLastReport >= a.intervals.ReportInterval {
 			log.Println("Start sending metrics to server")
-			err := handler.SendMetricsBatch(client, currentMetrics, a.baseURL)
+			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			err := handler.SendMetricsBatch(sendCtx, client, currentMetrics, a.baseURL)
+			cancel()
+
 			if err == nil {
 				a.pollCount = 0
 			} else {
-				log.Println(err)
+				log.Println("Failed to send metrics batch: ", err)
 			}
-
 			timeSinceLastReport = 0
 		}
 	}

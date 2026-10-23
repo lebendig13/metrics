@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func RestoreMetrics(memStorage *MemStorage, fileStoragePath string) error {
+func RestoreMetrics(ctx context.Context, memStorage *MemStorage, fileStoragePath string) error {
 	data, err := os.ReadFile(fileStoragePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -32,7 +32,7 @@ func RestoreMetrics(memStorage *MemStorage, fileStoragePath string) error {
 	}
 
 	for _, m := range savedMetrics {
-		err = memStorage.InsertOrUpdate(m)
+		err = memStorage.InsertOrUpdate(ctx, m)
 		if err != nil {
 			return fmt.Errorf("cannot restore metric %s to storage: %w", m.ID, err)
 		}
@@ -111,7 +111,7 @@ func ProcessBackup(ctx context.Context, memStorage *MemStorage, cnf *config.Serv
 	}
 
 	if cnf.Restore {
-		err := RestoreMetrics(memStorage, cnf.FileStoragePath)
+		err := RestoreMetrics(ctx, memStorage, cnf.FileStoragePath)
 		if err != nil {
 			logger.Log.Warn("Cannot restore metrics from file", zap.Error(err))
 		}
@@ -133,7 +133,7 @@ func ProcessBackup(ctx context.Context, memStorage *MemStorage, cnf *config.Serv
 		for {
 			select {
 			case <-ticker.C:
-				currentMetrics := memStorage.Snapshot()
+				currentMetrics := memStorage.Snapshot(ctx)
 				err := SaveMetrics(currentMetrics, cnf.FileStoragePath)
 				if err != nil {
 					logger.Log.Error("Cannot save current metrics", zap.Error(err))

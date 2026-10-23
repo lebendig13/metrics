@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	db "github.com/lebendig13/metrics/internal/config/db"
 	models "github.com/lebendig13/metrics/internal/model"
 )
@@ -33,13 +35,10 @@ func NewDBStorage(dbDSN string) (*DBStorage, error) {
 	return &dbst, nil
 }
 
-func (dbs *DBStorage) InsertOrUpdate(m models.Metrics) error {
+func (dbs *DBStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) error {
 	if m.ID == "" {
 		return errors.New("empty metric ID")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 
 	query := `
 		INSERT INTO metrics (id, type, delta, value)
@@ -55,26 +54,18 @@ func (dbs *DBStorage) InsertOrUpdate(m models.Metrics) error {
 	}
 
 	return nil
+
 }
 
-func (dbs *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 
-	ctx := context.TODO()
-	tx, err := dbs.sqldb.BeginTx(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	attemptIntervals := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
+	var lastErr error
 
-	for _, m := range metrics {
-		if m.ID == "" {
-			return errors.New("empty metric ID")
-		}
-
-		query := `
+	query := `
 		INSERT INTO metrics (id, type, delta, value)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id, type) 
@@ -82,16 +73,54 @@ func (dbs *DBStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE EXCLUDED.delta END,
 			value = CASE WHEN metrics.type = 'gauge' THEN EXCLUDED.value ELSE EXCLUDED.value END;
 	`
-		_, err := dbs.sqldb.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value)
-		if err != nil {
-			return fmt.Errorf("failed to insert or update metric %s: %w", m.ID, err)
+
+	for i := 0; i <= len(attemptIntervals); i++ {
+		err := func() error {
+			tx, err := dbs.sqldb.BeginTx(ctx)
+			if err != nil {
+				return fmt.Errorf("cannot begin transaction: %w", err)
+			}
+			defer tx.Rollback()
+
+			stmt, err := tx.PrepareContext(ctx, query)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+
+			for _, m := range metrics {
+				if m.ID == "" {
+					return errors.New("empty metric ID")
+				}
+				if _, err := stmt.ExecContext(ctx, m.ID, m.MType, m.Delta, m.Value); err != nil {
+					return err
+				}
+			}
+
+			return tx.Commit()
+		}()
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		if !isPostgresRetriable(lastErr) || i == len(attemptIntervals) {
+			break
+		}
+
+		select {
+		case <-time.After(attemptIntervals[i]):
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 
-	return tx.Commit()
+	return fmt.Errorf("failed to update batch after retries: %w", lastErr)
 }
 
-func (dbs *DBStorage) Get(id string) (models.Metrics, bool) {
+func (dbs *DBStorage) Get(ctx context.Context, id string) (models.Metrics, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -119,7 +148,7 @@ func (dbs *DBStorage) Get(id string) (models.Metrics, bool) {
 	return m, true
 }
 
-func (dbs *DBStorage) GetAllMetrics() map[string]string {
+func (dbs *DBStorage) GetAllMetrics(ctx context.Context) map[string]string {
 	result := make(map[string]string)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -155,11 +184,8 @@ func (dbs *DBStorage) GetAllMetrics() map[string]string {
 	return result
 }
 
-func (dbs *DBStorage) Snapshot() []models.Metrics {
+func (dbs *DBStorage) Snapshot(ctx context.Context) []models.Metrics {
 	var result []models.Metrics
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `SELECT id, type, delta, value FROM metrics;`
 	rows, err := dbs.sqldb.QueryContext(ctx, query)
@@ -194,7 +220,7 @@ func (dbs *DBStorage) Snapshot() []models.Metrics {
 	return result
 }
 
-func (dbs *DBStorage) Close() error {
+func (dbs *DBStorage) Close(ctx context.Context) error {
 	if dbs.sqldb != nil {
 		return dbs.sqldb.Close()
 	}
@@ -204,4 +230,20 @@ func (dbs *DBStorage) Close() error {
 
 func (dbs *DBStorage) CheckDBConnection() error {
 	return dbs.sqldb.CheckDBConnection()
+}
+
+func isPostgresRetriable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return strings.HasPrefix(pgErr.Code, "08")
+	}
+
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "connection refused") ||
+		strings.Contains(errMsg, "broken pipe") ||
+		strings.Contains(errMsg, "connection busy")
 }

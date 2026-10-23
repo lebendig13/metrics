@@ -27,7 +27,7 @@ func NewMemStorage(ctx context.Context, configP *config.ServerConfig) (*MemStora
 	return &mst, nil
 }
 
-func (ms *MemStorage) InsertOrUpdate(m models.Metrics) error {
+func (ms *MemStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) error {
 	if m.ID == "" {
 		return errors.New("empty metric ID")
 	}
@@ -59,7 +59,7 @@ func (ms *MemStorage) InsertOrUpdate(m models.Metrics) error {
 	return nil
 }
 
-func (ms *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
+func (ms *MemStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	for _, m := range metrics {
 		if m.ID == "" {
 			return errors.New("empty metric ID")
@@ -92,12 +92,12 @@ func (ms *MemStorage) UpdateMetricsBatch(metrics []models.Metrics) error {
 	return nil
 }
 
-func (ms *MemStorage) Get(id string) (models.Metrics, bool) {
+func (ms *MemStorage) Get(ctx context.Context, id string) (models.Metrics, bool) {
 	currentMetric, exists := ms.metrics[id]
 	return currentMetric, exists
 }
 
-func (ms *MemStorage) GetAllMetrics() map[string]string {
+func (ms *MemStorage) GetAllMetrics(ctx context.Context) map[string]string {
 	result := make(map[string]string)
 	for _, m := range ms.metrics {
 		switch m.MType {
@@ -116,7 +116,7 @@ func (ms *MemStorage) GetAllMetrics() map[string]string {
 	return result
 }
 
-func (ms *MemStorage) Snapshot() []models.Metrics {
+func (ms *MemStorage) Snapshot(ctx context.Context) []models.Metrics {
 	var result []models.Metrics
 	for _, m := range ms.metrics {
 		result = append(result, m)
@@ -124,13 +124,13 @@ func (ms *MemStorage) Snapshot() []models.Metrics {
 	return result
 }
 
-func (ms *MemStorage) Close() error {
+func (ms *MemStorage) Close(ctx context.Context) error {
 	if ms.fileStoragePath == "" {
 		return nil
 	}
 
 	logger.Log.Info("Saving current metrics before shutdown...")
-	currentMetrics := ms.Snapshot()
+	currentMetrics := ms.Snapshot(ctx)
 
 	err := SaveMetrics(currentMetrics, ms.fileStoragePath)
 	if err != nil {

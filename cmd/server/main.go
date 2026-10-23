@@ -33,7 +33,7 @@ func main() {
 		log.Fatal("Cannot initialize storage: ", err)
 	}
 	defer func() {
-		if err := storage.Close(); err != nil {
+		if err := storage.Close(ctx); err != nil {
 			logger.Log.Error("Failed to close storage", zap.Error(err))
 		} else {
 			logger.Log.Info("Storage closed successfully")

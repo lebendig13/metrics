@@ -26,7 +26,7 @@ type testStorageWrapper struct {
 	*mocks.MockDBConnection
 }
 
-func (w testStorageWrapper) Close() error {
+func (w testStorageWrapper) Close(ctx context.Context) error {
 	return nil
 }
 
@@ -167,8 +167,8 @@ func TestGetMetricHandler(t *testing.T) {
 	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
 	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
@@ -247,8 +247,8 @@ func TestGetAllMetricsHandler(t *testing.T) {
 	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
 	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
@@ -402,8 +402,8 @@ func TestValueJSONHandler(t *testing.T) {
 	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
 	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
