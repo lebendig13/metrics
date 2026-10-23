@@ -1,14 +1,19 @@
-package handler
+package agent
 
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	models "github.com/lebendig13/metrics/internal/model"
 )
@@ -111,4 +116,75 @@ func CompressData(data io.Reader) (bytes.Buffer, error) {
 	}
 
 	return compressedData, nil
+}
+
+func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metrics, baseURL string) error {
+	body, err := json.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("cannot marshal metrics: %v", err)
+	}
+
+	compressedBody, err := CompressData(bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("cannot compress body: %v", err)
+	}
+	rawBytes := compressedBody.Bytes()
+
+	attemptIntervals := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
+	var lastErr error
+
+	for i := 0; i <= len(attemptIntervals); i++ {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("context cancelled before/during retries: %w", err)
+		}
+
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(rawBytes))
+		if err != nil {
+			return fmt.Errorf("cannot create request: %w. URL: %s", err, baseURL)
+		}
+
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Content-Encoding", "gzip")
+		request.Header.Set("Accept-Encoding", "gzip")
+
+		response, err := client.Do(request)
+		if err == nil {
+			defer response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				return fmt.Errorf("got status %v for URL: %s", response.StatusCode, baseURL)
+			}
+			return nil
+		}
+
+		lastErr = err
+
+		if i == len(attemptIntervals) || !isNetworkError(err) {
+			break
+		}
+
+		log.Printf("Failed send metrics batch: network error. Attempt %d. Wait %v. Error: %v", i+1, attemptIntervals[i], err)
+		select {
+		case <-time.After(attemptIntervals[i]):
+		case <-ctx.Done():
+			return fmt.Errorf("context timed out during retry delay: %w", ctx.Err())
+		}
+	}
+
+	return fmt.Errorf("cannot send request after retries: %w. URL: %s", lastErr, baseURL)
+}
+
+func isNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+	return false
 }
