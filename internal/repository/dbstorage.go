@@ -121,9 +121,6 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 }
 
 func (dbs *DBStorage) Get(ctx context.Context, id string) (models.Metrics, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	query := `SELECT id, type, delta, value FROM metrics WHERE id = $1;`
 
 	var m models.Metrics
@@ -150,9 +147,6 @@ func (dbs *DBStorage) Get(ctx context.Context, id string) (models.Metrics, bool)
 
 func (dbs *DBStorage) GetAllMetrics(ctx context.Context) map[string]string {
 	result := make(map[string]string)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	query := `SELECT id, type, delta, value FROM metrics;`
 	rows, err := dbs.sqldb.QueryContext(ctx, query)
