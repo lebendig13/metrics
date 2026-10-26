@@ -21,15 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testStorageWrapper struct {
-	*mocks.MockStorage
-	*mocks.MockDBConnection
-}
-
-func (w testStorageWrapper) Close(ctx context.Context) error {
-	return nil
-}
-
 // Настройка логгера для тестов сделана по подсказке ИИ
 func TestMain(m *testing.M) {
 	// Настраиваем логгер один раз перед запуском всех тестов в пакете
@@ -482,13 +473,13 @@ func TestPingDB(t *testing.T) {
 	tests := []struct {
 		name       string
 		method     string
-		mockOption func(m *mocks.MockDBConnection)
+		mockOption func(m *mocks.MockStorage)
 		want       want
 	}{
 		{
 			name:   "success",
 			method: http.MethodGet,
-			mockOption: func(m *mocks.MockDBConnection) {
+			mockOption: func(m *mocks.MockStorage) {
 				m.EXPECT().CheckDBConnection().Return(nil).Times(1)
 			},
 			want: want{
@@ -498,7 +489,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "no database",
 			method: http.MethodGet,
-			mockOption: func(m *mocks.MockDBConnection) {
+			mockOption: func(m *mocks.MockStorage) {
 				m.EXPECT().CheckDBConnection().Return(errors.New("no database")).Times(1)
 			},
 			want: want{
@@ -517,23 +508,17 @@ func TestPingDB(t *testing.T) {
 		mockctrl := gomock.NewController(t)
 		defer mockctrl.Finish()
 
-		mockDB := mocks.NewMockDBConnection(mockctrl)
-		mockStorageMethods := mocks.NewMockStorage(mockctrl)
+		mockStorage := mocks.NewMockStorage(mockctrl)
 
 		if test.mockOption != nil {
-			test.mockOption(mockDB)
-		}
-
-		wrapper := testStorageWrapper{
-			MockStorage:      mockStorageMethods,
-			MockDBConnection: mockDB,
+			test.mockOption(mockStorage)
 		}
 
 		configP := config.ServerConfig{
 			DatabaseDSN: "dsn",
 		}
 
-		server := NewServer(wrapper, &configP)
+		server := NewServer(mockStorage, &configP)
 		ts := httptest.NewServer(MetricsRouter(server))
 		defer ts.Close()
 

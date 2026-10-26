@@ -13,10 +13,6 @@ import (
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
-type Pingable interface {
-	CheckDBConnection() error
-}
-
 type DBStorage struct {
 	sqldb *db.SQLDB
 }

@@ -140,3 +140,7 @@ func (ms *MemStorage) Close(ctx context.Context) error {
 	logger.Log.Info("Current metrics saved successfully")
 	return nil
 }
+
+func (ms *MemStorage) CheckDBConnection() error {
+	return nil
+}

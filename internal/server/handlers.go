@@ -324,14 +324,7 @@ func (s *Server) PingDB(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	dbst, ok := s.storage.(repository.Pingable)
-	if !ok {
-		logger.Log.Error("No DBStorage")
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := dbst.CheckDBConnection(); err != nil {
+	if err := s.storage.CheckDBConnection(); err != nil {
 		logger.Log.Error("Check DB connection failed, ", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return

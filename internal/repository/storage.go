@@ -15,6 +15,7 @@ type Storage interface {
 	GetAllMetrics(ctx context.Context) map[string]string
 	Snapshot(ctx context.Context) []models.Metrics
 	Close(ctx context.Context) error
+	CheckDBConnection() error
 }
 
 func NewStorage(ctx context.Context, configP *config.ServerConfig) (Storage, error) {

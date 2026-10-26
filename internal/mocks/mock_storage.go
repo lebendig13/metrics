@@ -35,6 +35,20 @@ func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
 }
 
+// CheckDBConnection mocks base method.
+func (m *MockStorage) CheckDBConnection() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckDBConnection")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CheckDBConnection indicates an expected call of CheckDBConnection.
+func (mr *MockStorageMockRecorder) CheckDBConnection() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckDBConnection", reflect.TypeOf((*MockStorage)(nil).CheckDBConnection))
+}
+
 // Close mocks base method.
 func (m *MockStorage) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
