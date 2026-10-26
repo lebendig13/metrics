@@ -41,8 +41,8 @@ func (dbs *DBStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) erro
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id, type) 
 		DO UPDATE SET 
-			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE EXCLUDED.delta END,
-			value = CASE WHEN metrics.type = 'gauge' THEN EXCLUDED.value ELSE EXCLUDED.value END;
+			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE metrics.delta END,
+			value = EXCLUDED.value;
 	`
 	_, err := dbs.sqldb.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value)
 	if err != nil {
@@ -66,8 +66,8 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id, type) 
 		DO UPDATE SET 
-			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE EXCLUDED.delta END,
-			value = CASE WHEN metrics.type = 'gauge' THEN EXCLUDED.value ELSE EXCLUDED.value END;
+			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE metrics.delta END,
+			value = EXCLUDED.value;
 	`
 
 	for i := 0; i <= len(attemptIntervals); i++ {
@@ -76,7 +76,9 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 			if err != nil {
 				return fmt.Errorf("cannot begin transaction: %w", err)
 			}
-			defer tx.Rollback()
+			defer func() {
+				_ = tx.Rollback()
+			}()
 
 			stmt, err := tx.PrepareContext(ctx, query)
 			if err != nil {
