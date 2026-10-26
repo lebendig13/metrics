@@ -7,7 +7,6 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/lebendig13/metrics/internal/logger"
 )
 
 type DBConnection interface {
@@ -20,18 +19,20 @@ type SQLDB struct {
 
 func InitDBConnection(databaseDSN string) (*SQLDB, error) {
 	if databaseDSN == "" {
-		if logger.Log != nil {
-			logger.Log.Info("Database DSN is empty")
-		} else {
-			fmt.Println("Database DSN is empty")
-		}
-
-		return nil, nil
+		return nil, fmt.Errorf("database DSN is empty")
 	}
 
 	db, err := sql.Open("pgx", databaseDSN)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open database: %w", err)
+	}
+
+	// ping БД для проверки, что все ок
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("database ping failed on init: %w", err)
 	}
 
 	sqldb := &SQLDB{db: db}
@@ -75,14 +76,14 @@ func (d *SQLDB) QueryContext(ctx context.Context, query string, args ...any) (*s
 
 func (d *SQLDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	if d.db == nil {
-		return &sql.Row{}
+		return nil
 	}
 	return d.db.QueryRowContext(ctx, query, args...)
 }
 
 func (d *SQLDB) BeginTx(ctx context.Context) (*sql.Tx, error) {
 	if d.db == nil {
-		return &sql.Tx{}, fmt.Errorf("nil db")
+		return nil, fmt.Errorf("nil db")
 	}
 	return d.db.BeginTx(ctx, nil)
 }

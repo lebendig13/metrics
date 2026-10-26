@@ -14,12 +14,14 @@ import (
 type MemStorage struct {
 	metrics         map[string]models.Metrics
 	fileStoragePath string
+	databaseDSN     string
 }
 
 func NewMemStorage(ctx context.Context, configP *config.ServerConfig) (*MemStorage, error) {
 	mst := MemStorage{
 		metrics:         make(map[string]models.Metrics),
 		fileStoragePath: configP.FileStoragePath,
+		databaseDSN:     configP.DatabaseDSN,
 	}
 
 	ProcessBackup(ctx, &mst, configP)
@@ -142,5 +144,8 @@ func (ms *MemStorage) Close(ctx context.Context) error {
 }
 
 func (ms *MemStorage) CheckDBConnection() error {
+	if ms.databaseDSN != "" {
+		return fmt.Errorf("database DSN was provided (%s), but server uses MemStorage", ms.databaseDSN)
+	}
 	return nil
 }
