@@ -138,21 +138,31 @@ func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metr
 			return fmt.Errorf("context cancelled before/during retries: %w", err)
 		}
 
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(rawBytes))
-		if err != nil {
-			return fmt.Errorf("cannot create request: %w. URL: %s", err, baseURL)
-		}
+		err = func() error {
+			request, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(rawBytes))
+			if err != nil {
+				return fmt.Errorf("cannot create request: %w. URL: %s", err, baseURL)
+			}
 
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Content-Encoding", "gzip")
-		request.Header.Set("Accept-Encoding", "gzip")
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Content-Encoding", "gzip")
+			request.Header.Set("Accept-Encoding", "gzip")
 
-		response, err := client.Do(request)
-		if err == nil {
+			response, err := client.Do(request)
+			if err != nil {
+				return err
+			}
+
 			defer response.Body.Close()
+
+			_, _ = io.Copy(io.Discard, response.Body)
 			if response.StatusCode != http.StatusOK {
 				return fmt.Errorf("got status %v for URL: %s", response.StatusCode, baseURL)
 			}
+			return nil
+		}()
+
+		if err == nil {
 			return nil
 		}
 
