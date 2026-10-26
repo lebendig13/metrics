@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/lebendig13/metrics/internal/config"
 	"github.com/lebendig13/metrics/internal/logger"
@@ -12,6 +13,7 @@ import (
 )
 
 type MemStorage struct {
+	mx              sync.RWMutex
 	metrics         map[string]models.Metrics
 	fileStoragePath string
 	databaseDSN     string
@@ -33,6 +35,9 @@ func (ms *MemStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) erro
 	if m.ID == "" {
 		return errors.New("empty metric ID")
 	}
+
+	ms.mx.Lock()
+	defer ms.mx.Unlock()
 
 	if ms.metrics == nil {
 		ms.metrics = make(map[string]models.Metrics)
@@ -62,6 +67,9 @@ func (ms *MemStorage) InsertOrUpdate(ctx context.Context, m models.Metrics) erro
 }
 
 func (ms *MemStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
+	ms.mx.Lock()
+	defer ms.mx.Unlock()
+
 	for _, m := range metrics {
 		if m.ID == "" {
 			return errors.New("empty metric ID")
@@ -95,11 +103,17 @@ func (ms *MemStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 }
 
 func (ms *MemStorage) Get(ctx context.Context, id string) (models.Metrics, bool) {
+	ms.mx.RLock()
+	defer ms.mx.RUnlock()
+
 	currentMetric, exists := ms.metrics[id]
 	return currentMetric, exists
 }
 
 func (ms *MemStorage) GetAllMetrics(ctx context.Context) map[string]string {
+	ms.mx.RLock()
+	defer ms.mx.RUnlock()
+
 	result := make(map[string]string)
 	for _, m := range ms.metrics {
 		switch m.MType {
@@ -119,6 +133,9 @@ func (ms *MemStorage) GetAllMetrics(ctx context.Context) map[string]string {
 }
 
 func (ms *MemStorage) Snapshot(ctx context.Context) []models.Metrics {
+	ms.mx.RLock()
+	defer ms.mx.RUnlock()
+
 	var result []models.Metrics
 	for _, m := range ms.metrics {
 		result = append(result, m)
