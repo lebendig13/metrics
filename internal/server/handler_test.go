@@ -1,21 +1,41 @@
-package handler
+package server
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/lebendig13/metrics/internal/config"
+	"github.com/lebendig13/metrics/internal/logger"
+	"github.com/lebendig13/metrics/internal/mocks"
 	models "github.com/lebendig13/metrics/internal/model"
+	"github.com/lebendig13/metrics/internal/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// Настройка логгера для тестов сделана по подсказке ИИ
+func TestMain(m *testing.M) {
+	// Настраиваем логгер один раз перед запуском всех тестов в пакете
+	_ = logger.Initialize("info")
+
+	// Запускаем тесты и выходим с корректным кодом
+	os.Exit(m.Run())
+}
+
 func TestUpdateMetricHandler(t *testing.T) {
-	memStorage := models.NewMemStorage()
+	ctx := context.Background()
+	configP := config.ServerConfig{}
+
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	server := NewServer(memStorage, &config.ServerConfig{})
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
@@ -131,11 +151,15 @@ func TestUpdateMetricHandler(t *testing.T) {
 }
 
 func TestGetMetricHandler(t *testing.T) {
-	memStorage := models.NewMemStorage()
+	ctx := context.Background()
+	configP := config.ServerConfig{}
+
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
 	server := NewServer(memStorage, &config.ServerConfig{})
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
@@ -207,12 +231,16 @@ func TestGetMetricHandler(t *testing.T) {
 }
 
 func TestGetAllMetricsHandler(t *testing.T) {
-	memStorage := models.NewMemStorage()
+	ctx := context.Background()
+	configP := config.ServerConfig{}
+
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage, &config.ServerConfig{})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -245,8 +273,12 @@ func TestGetAllMetricsHandler(t *testing.T) {
 }
 
 func TestUpdateMetricJSONHandler(t *testing.T) {
-	memStorage := models.NewMemStorage()
-	server := NewServer(memStorage, &config.ServerConfig{})
+	ctx := context.Background()
+	configP := config.ServerConfig{}
+
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
+	server := NewServer(memStorage, &configP)
 	router := MetricsRouter(server)
 	testServer := httptest.NewServer(router)
 	defer testServer.Close()
@@ -354,12 +386,16 @@ func TestUpdateMetricJSONHandler(t *testing.T) {
 }
 
 func TestValueJSONHandler(t *testing.T) {
-	memStorage := models.NewMemStorage()
+	ctx := context.Background()
+	configP := config.ServerConfig{}
+
+	memStorage, err := repository.NewMemStorage(ctx, &configP)
+	require.NoError(t, err)
 	dvalue := int64(1)
 	vvalue := 0.1
-	memStorage.InsertOrUpdate(models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
-	memStorage.InsertOrUpdate(models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
-	server := NewServer(memStorage, &config.ServerConfig{})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &dvalue})
+	memStorage.InsertOrUpdate(ctx, models.Metrics{ID: "Alloc", MType: models.Gauge, Value: &vvalue})
+	server := NewServer(memStorage, &configP)
 	ts := httptest.NewServer(MetricsRouter(server))
 	defer ts.Close()
 
@@ -427,5 +463,73 @@ func TestValueJSONHandler(t *testing.T) {
 			assert.Equal(t, test.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, test.want.body, strings.TrimSpace(string(resBody)))
 		}
+	}
+}
+
+func TestPingDB(t *testing.T) {
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name       string
+		method     string
+		mockOption func(m *mocks.MockStorage)
+		want       want
+	}{
+		{
+			name:   "success",
+			method: http.MethodGet,
+			mockOption: func(m *mocks.MockStorage) {
+				m.EXPECT().CheckDBConnection().Return(nil).Times(1)
+			},
+			want: want{
+				code: http.StatusOK,
+			},
+		},
+		{
+			name:   "no database",
+			method: http.MethodGet,
+			mockOption: func(m *mocks.MockStorage) {
+				m.EXPECT().CheckDBConnection().Return(errors.New("no database")).Times(1)
+			},
+			want: want{
+				code: http.StatusInternalServerError,
+			},
+		},
+		{
+			name:   "method not allowed",
+			method: http.MethodPost,
+			want: want{
+				code: http.StatusMethodNotAllowed,
+			},
+		},
+	}
+	for _, test := range tests {
+		mockctrl := gomock.NewController(t)
+		defer mockctrl.Finish()
+
+		mockStorage := mocks.NewMockStorage(mockctrl)
+
+		if test.mockOption != nil {
+			test.mockOption(mockStorage)
+		}
+
+		configP := config.ServerConfig{
+			DatabaseDSN: "dsn",
+		}
+
+		server := NewServer(mockStorage, &configP)
+		ts := httptest.NewServer(MetricsRouter(server))
+		defer ts.Close()
+
+		request, err := http.NewRequest(test.method, ts.URL+"/ping", nil)
+		require.NoError(t, err)
+
+		resp, err := ts.Client().Do(request)
+		require.NoError(t, err)
+
+		assert.Equal(t, test.want.code, resp.StatusCode)
+
+		defer resp.Body.Close()
 	}
 }

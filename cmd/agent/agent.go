@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -8,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	handler "github.com/lebendig13/metrics/internal/agent"
 	config "github.com/lebendig13/metrics/internal/config"
-	handler "github.com/lebendig13/metrics/internal/handler"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
@@ -26,7 +27,7 @@ type Agent struct {
 
 func NewAgentDefault() *Agent {
 	return &Agent{
-		baseURL: "http://localhost:8080/update/",
+		baseURL: "http://localhost:8080/updates/",
 		intervals: Intervals{
 			PollInterval:   time.Duration(2) * time.Second,
 			ReportInterval: time.Duration(10) * time.Second,
@@ -37,7 +38,7 @@ func NewAgentDefault() *Agent {
 
 func NewAgent(cnf *config.AgentConfig) *Agent {
 	return &Agent{
-		baseURL: fmt.Sprintf("http://%s/update", cnf.ServerAddress),
+		baseURL: fmt.Sprintf("http://%s/updates/", cnf.ServerAddress),
 		intervals: Intervals{
 			PollInterval:   time.Duration(cnf.Intervals.PollInterval) * time.Second,
 			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,
@@ -49,7 +50,7 @@ func NewAgent(cnf *config.AgentConfig) *Agent {
 func (a *Agent) Process() {
 	log.Println("Agent started")
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	rng := rand.New(rand.NewSource((time.Now().UnixNano())))
@@ -64,13 +65,15 @@ func (a *Agent) Process() {
 		timeSinceLastReport += a.intervals.PollInterval
 		if timeSinceLastReport >= a.intervals.ReportInterval {
 			log.Println("Start sending metrics to server")
-			err := handler.SendMetrics(client, currentMetrics, a.baseURL)
+			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			err := handler.SendMetricsBatch(sendCtx, client, currentMetrics, a.baseURL)
+			cancel()
+
 			if err == nil {
 				a.pollCount = 0
 			} else {
-				log.Println(err)
+				log.Println("Failed to send metrics batch: ", err)
 			}
-
 			timeSinceLastReport = 0
 		}
 	}
