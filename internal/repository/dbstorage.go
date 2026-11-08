@@ -76,9 +76,7 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 			if err != nil {
 				return fmt.Errorf("cannot begin transaction: %w", err)
 			}
-			defer func() {
-				_ = tx.Rollback()
-			}()
+			defer tx.Rollback()
 
 			stmt, err := tx.PrepareContext(ctx, query)
 			if err != nil {

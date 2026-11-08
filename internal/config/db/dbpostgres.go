@@ -26,6 +26,9 @@ func InitDBConnection(databaseDSN string) (*SQLDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot open database: %w", err)
 	}
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(20)
+	db.SetConnMaxLifetime(time.Minute * 3)
 
 	// ping БД для проверки, что все ок
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
