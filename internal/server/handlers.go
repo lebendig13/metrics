@@ -148,6 +148,7 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 					return
 				}
 
+				r.Body.Close()
 				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 				if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
