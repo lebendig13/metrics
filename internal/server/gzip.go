@@ -94,9 +94,5 @@ func (c *compressReader) Close() error {
 	}
 	c.isClosed = true
 
-	if err := c.zr.Close(); err != nil {
-		return err
-	}
-
-	return c.r.Close()
+	return c.zr.Close()
 }

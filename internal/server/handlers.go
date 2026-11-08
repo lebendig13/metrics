@@ -225,8 +225,8 @@ func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Requ
 	var reqm models.Metrics
 	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&reqm); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
-		res.WriteHeader(http.StatusInternalServerError)
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -240,11 +240,16 @@ func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Requ
 	s.SaveMetricsIfNecessary(req.Context())
 
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(&reqm); err != nil {
+	responseBytes, err := json.Marshal(&reqm)
+	if err != nil {
 		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
 }
 
@@ -348,8 +353,8 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 	var reqm models.Metrics
 	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&reqm); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
-		res.WriteHeader(http.StatusInternalServerError)
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -371,12 +376,16 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(metric); err != nil {
+	responseBytes, err := json.Marshal(metric)
+	if err != nil {
 		logger.Log.Error("error encoding response", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
 }
 
