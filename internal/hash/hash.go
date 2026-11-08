@@ -3,7 +3,7 @@ package hash
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/hex"
 	"errors"
 )
 
@@ -15,11 +15,11 @@ func GetHashSha256(hashKey string, rawBytes []byte) (string, error) {
 	h := hmac.New(sha256.New, []byte(hashKey))
 	h.Write(rawBytes)
 	resultHash := h.Sum(nil)
-	return base64.StdEncoding.EncodeToString(resultHash), nil
+	return hex.EncodeToString(resultHash), nil
 }
 
 func GetHashFromString(hashStr string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(hashStr)
+	return hex.DecodeString(hashStr)
 }
 
 func CheckHashSha256(hashKey string, expectedHash []byte, rawBytes []byte) bool {
