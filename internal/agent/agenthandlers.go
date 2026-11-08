@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/lebendig13/metrics/internal/hash"
 	models "github.com/lebendig13/metrics/internal/model"
 )
 
@@ -118,10 +119,15 @@ func CompressData(data io.Reader) (bytes.Buffer, error) {
 	return compressedData, nil
 }
 
-func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metrics, baseURL string) error {
+func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metrics, baseURL string, hashKey string) error {
 	body, err := json.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("cannot marshal metrics: %v", err)
+	}
+
+	hashValue, err := hash.GetHashSha256(hashKey, body)
+	if err != nil {
+		log.Printf("%s", err.Error())
 	}
 
 	compressedBody, err := CompressData(bytes.NewReader(body))
@@ -147,6 +153,9 @@ func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metr
 			request.Header.Set("Content-Type", "application/json")
 			request.Header.Set("Content-Encoding", "gzip")
 			request.Header.Set("Accept-Encoding", "gzip")
+			if hashKey != "" {
+				request.Header.Set("HashSHA256", hashValue)
+			}
 
 			response, err := client.Do(request)
 			if err != nil {

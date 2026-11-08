@@ -23,6 +23,7 @@ type Agent struct {
 	baseURL   string
 	intervals Intervals
 	pollCount int64
+	hashKey   string
 }
 
 func NewAgentDefault() *Agent {
@@ -33,6 +34,7 @@ func NewAgentDefault() *Agent {
 			ReportInterval: time.Duration(10) * time.Second,
 		},
 		pollCount: 0,
+		hashKey:   "",
 	}
 }
 
@@ -44,6 +46,7 @@ func NewAgent(cnf *config.AgentConfig) *Agent {
 			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,
 		},
 		pollCount: 0,
+		hashKey:   cnf.HashKey,
 	}
 }
 
@@ -66,7 +69,7 @@ func (a *Agent) Process() {
 		if timeSinceLastReport >= a.intervals.ReportInterval {
 			log.Println("Start sending metrics to server")
 			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			err := handler.SendMetricsBatch(sendCtx, client, currentMetrics, a.baseURL)
+			err := handler.SendMetricsBatch(sendCtx, client, currentMetrics, a.baseURL, a.hashKey)
 			cancel()
 
 			if err == nil {

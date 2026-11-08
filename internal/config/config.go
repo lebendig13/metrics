@@ -17,6 +17,7 @@ type ServerConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         bool   `env:"RESTORE"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
+	HashKey         string `end:"KEY"`
 }
 
 type AgentConfigIntervals struct {
@@ -27,6 +28,7 @@ type AgentConfigIntervals struct {
 type AgentConfig struct {
 	ServerAddress string `env:"ADDRESS"`
 	Intervals     AgentConfigIntervals
+	HashKey       string `end:"KEY"`
 }
 
 func GetServerConfig() ServerConfig {
@@ -37,6 +39,7 @@ func GetServerConfig() ServerConfig {
 	flag.StringVar(&result.FileStoragePath, "f", "/home/user/metrics/metrics_values.txt", "file storage path")
 	flag.BoolVar(&result.Restore, "r", false, "restore saved metrics when server starts")
 	flag.StringVar(&result.DatabaseDSN, "d", fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metricsuser`, `metricsuser`, `metrics`), "database connection string")
+	flag.StringVar(&result.HashKey, "k", "", "hash key")
 	flag.Parse()
 
 	var envConfig ServerConfig
@@ -72,6 +75,9 @@ func GetServerConfig() ServerConfig {
 	if envConfig.DatabaseDSN != "" {
 		result.DatabaseDSN = envConfig.DatabaseDSN
 	}
+	if envConfig.HashKey != "" {
+		result.HashKey = envConfig.HashKey
+	}
 	return result
 }
 
@@ -81,6 +87,7 @@ func GetAgentConfig() AgentConfig {
 	flag.StringVar(&result.ServerAddress, "a", "localhost:8080", "address and port of the server")
 	flag.IntVar(&result.Intervals.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&result.Intervals.PollInterval, "p", 2, "poll interval")
+	flag.StringVar(&result.HashKey, "k", "", "hash key")
 	flag.Parse()
 
 	var envConfig AgentConfig
@@ -108,9 +115,13 @@ func GetAgentConfig() AgentConfig {
 		}
 		result.Intervals.PollInterval = piEnvValue
 	}
+	if envConfig.HashKey != "" {
+		result.HashKey = envConfig.HashKey
+	}
 
 	log.Println("Server address: ", result.ServerAddress,
 		"; pollInterval = ", result.Intervals.PollInterval,
-		"; reportInterval = ", result.Intervals.ReportInterval)
+		"; reportInterval = ", result.Intervals.ReportInterval,
+		"; hash key: ", result.HashKey)
 	return result
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"html/template"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/lebendig13/metrics/internal/config"
+	"github.com/lebendig13/metrics/internal/hash"
 	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
 	"github.com/lebendig13/metrics/internal/repository"
@@ -51,6 +53,7 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
+	router.Use(HashSha256Middleware(server.config.HashKey))
 	router.Get("/ping", server.PingDB)
 	router.Post("/updates/", server.UpdateMetricsBatchHandler)
 	router.Post("/update", server.UpdateMetricJSONHandler)
@@ -82,6 +85,7 @@ func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 				zap.Int("size", lw.BytesWritten()),
 				zap.String("content-type", lw.Header().Get("Content-Type")),
 				zap.String("content-encoding", lw.Header().Get("Content-Encoding")),
+				zap.String("hash", lw.Header().Get("HashSHA256")),
 			)
 		})
 	}
@@ -115,6 +119,47 @@ func GzipMiddleware(h http.Handler) http.Handler {
 
 		h.ServeHTTP(ow, r)
 	})
+}
+
+func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if hashKey == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			clientHashStr := r.Header.Get("HashSHA256")
+
+			if clientHashStr != "" {
+				clientHash, err := hash.GetHashFromString(clientHashStr)
+				if err != nil {
+					http.Error(w, "Cannot get hash value from header", http.StatusBadRequest)
+					return
+				}
+
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+				if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
+					http.Error(w, "Bad request: hash verification failed", http.StatusBadRequest)
+					return
+				}
+			}
+
+			hw := &hashWriter{
+				ResponseWriter: w,
+				hashKey:        hashKey,
+			}
+
+			next.ServeHTTP(hw, r)
+		})
+	}
 }
 
 func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
