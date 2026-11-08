@@ -206,11 +206,18 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 	}
 
 	res.Header().Set("Content-Type", "application/json")
+
+	responseBytes, err := json.Marshal(&reqmetrics)
+	if err != nil {
+		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	res.WriteHeader(http.StatusOK)
 
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(&reqmetrics); err != nil {
-		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
 }
 
