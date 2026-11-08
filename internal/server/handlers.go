@@ -186,11 +186,17 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 }
 
 func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		logger.Log.Error("Cannot read request body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var reqmetrics []models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqmetrics); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
-		res.WriteHeader(http.StatusInternalServerError)
+	if err := json.Unmarshal(bodyBytes, &reqmetrics); err != nil {
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -201,7 +207,7 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 		}
 	}
 
-	err := s.storage.UpdateMetricsBatch(req.Context(), reqmetrics)
+	err = s.storage.UpdateMetricsBatch(req.Context(), reqmetrics)
 	if err != nil {
 		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
@@ -225,15 +231,20 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 }
 
 func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var reqm models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqm); err != nil {
+	if err := json.Unmarshal(bodyBytes, &reqm); err != nil {
 		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	err := s.storage.InsertOrUpdate(req.Context(), reqm)
+	err = s.storage.InsertOrUpdate(req.Context(), reqm)
 	if err != nil {
 		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
@@ -353,9 +364,14 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var reqm models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqm); err != nil {
+	if err := json.Unmarshal(bodyBytes, &reqm); err != nil {
 		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
 		res.WriteHeader(http.StatusBadRequest)
 		return
