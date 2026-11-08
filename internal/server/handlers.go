@@ -177,7 +177,10 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 			}
 
 			w.WriteHeader(hw.statusCode)
-			w.Write(responseBytes)
+
+			if len(responseBytes) > 0 {
+				w.Write(responseBytes)
+			}
 		})
 	}
 }
