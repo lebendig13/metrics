@@ -111,13 +111,17 @@ func GzipMiddleware(h http.Handler) http.Handler {
 		// сжатие ответа клиенту
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := acceptEncoding != "" && strings.Contains(acceptEncoding, "gzip")
+		var cw *compressWriter
 		if supportsGzip {
 			cw := newCompressWriter(w)
 			ow = cw
-			defer cw.Close()
 		}
 
 		h.ServeHTTP(ow, r)
+
+		if supportsGzip && cw != nil {
+			cw.Close()
+		}
 	})
 }
 
