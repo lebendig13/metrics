@@ -113,13 +113,13 @@ func GzipMiddleware(h http.Handler) http.Handler {
 		supportsGzip := acceptEncoding != "" && strings.Contains(acceptEncoding, "gzip")
 		var cw *compressWriter
 		if supportsGzip {
-			cw := newCompressWriter(w)
+			cw = newCompressWriter(w)
 			ow = cw
 		}
 
 		h.ServeHTTP(ow, r)
 
-		if supportsGzip && cw != nil {
+		if supportsGzip {
 			cw.Close()
 		}
 	})
