@@ -67,7 +67,8 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 		ON CONFLICT (id, type) 
 		DO UPDATE SET 
 			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE metrics.delta END,
-			value = EXCLUDED.value;`
+			value = EXCLUDED.value;
+	`
 
 	for i := 0; i <= len(attemptIntervals); i++ {
 		err := func() error {
@@ -77,19 +78,13 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, query)
-			if err != nil {
-				return err
-			}
-			defer stmt.Close()
-
 			for _, m := range metrics {
 				if m.ID == "" {
 					return errors.New("empty metric ID")
 				}
 
-				if _, err := stmt.ExecContext(ctx, m.ID, m.MType, m.Delta, m.Value); err != nil {
-					return err
+				if _, err := tx.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value); err != nil {
+					return fmt.Errorf("execute context failed for metric %s: %w", m.ID, err)
 				}
 			}
 
