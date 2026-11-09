@@ -129,14 +129,6 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 				return
 			}
 
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "Internal Server Error: cannot read body", http.StatusInternalServerError)
-				return
-			}
-			r.Body.Close()
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 			clientHashStr := r.Header.Get("HashSHA256")
 
 			if clientHashStr != "" {
@@ -150,6 +142,14 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 					http.Error(w, "Cannot decode hash header", http.StatusBadRequest)
 					return
 				}
+
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 				if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
 					http.Error(w, "Bad request: hash verification failed", http.StatusBadRequest)
@@ -168,8 +168,11 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 			responseBytes := hw.buffer.Bytes()
 
-			if len(responseBytes) > 2 {
-				serverHash, err := hash.GetHashSha256(hashKey, responseBytes)
+			var serverHash string
+			var err error
+
+			if len(responseBytes) > 0 {
+				serverHash, err = hash.GetHashSha256(hashKey, responseBytes)
 				if err != nil {
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
