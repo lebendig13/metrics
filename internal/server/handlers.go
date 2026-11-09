@@ -172,11 +172,8 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 			responseBytes := hw.buffer.Bytes()
 
-			var serverHash string
-			var err error
-
 			if len(responseBytes) > 0 {
-				serverHash, err = hash.GetHashSha256(hashKey, responseBytes)
+				serverHash, err := hash.GetHashSha256(hashKey, responseBytes)
 				if err != nil {
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
