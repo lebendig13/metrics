@@ -136,35 +136,31 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 			clientHashStr := r.Header.Get("HashSHA256")
 
-			if clientHashStr == "" {
-				logger.Log.Error("Bad request: missing HashSHA256 header when key is configured")
-				http.Error(w, "Missing HashSHA256 header", http.StatusBadRequest)
-				return
-			}
+			if clientHashStr != "" {
+				if len(clientHashStr) != 64 {
+					http.Error(w, "Invalid HashSHA256 header length", http.StatusBadRequest)
+					return
+				}
 
-			if len(clientHashStr) != 64 {
-				http.Error(w, "Invalid HashSHA256 header length", http.StatusBadRequest)
-				return
-			}
+				clientHash, err := hash.GetHashFromString(clientHashStr)
+				if err != nil {
+					http.Error(w, "Cannot get hash value from header", http.StatusBadRequest)
+					return
+				}
 
-			clientHash, err := hash.GetHashFromString(clientHashStr)
-			if err != nil {
-				http.Error(w, "Cannot get hash value from header", http.StatusBadRequest)
-				return
-			}
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
 
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				return
-			}
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-			r.Body.Close()
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-			if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
-				http.Error(w, "Bad request: hash verification failed", http.StatusBadRequest)
-				return
+				if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
+					http.Error(w, "Bad request: hash verification failed", http.StatusBadRequest)
+					return
+				}
 			}
 
 			hw := &hashWriter{
