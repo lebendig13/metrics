@@ -76,13 +76,14 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 			if err != nil {
 				return fmt.Errorf("cannot begin transaction: %w", err)
 			}
-			defer tx.Rollback()
+			defer func() {
+				_ = tx.Rollback()
+			}()
 
 			for _, m := range metrics {
 				if m.ID == "" {
 					return errors.New("empty metric ID")
 				}
-
 				if _, err := tx.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value); err != nil {
 					return fmt.Errorf("execute context failed for metric %s: %w", m.ID, err)
 				}
