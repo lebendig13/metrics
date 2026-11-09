@@ -98,11 +98,10 @@ func GzipMiddleware(h http.Handler) http.Handler {
 		// чтение сжатого тела запроса от клиента
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := contentEncoding != "" && strings.Contains(contentEncoding, "gzip")
-		if sendsGzip && r.ContentLength != 0 {
+		if sendsGzip {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
-				log.Printf("!!! GZIP MIDDLEWARE WARNING: %v", err)
-				h.ServeHTTP(w, r)
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			r.Body = cr
@@ -112,17 +111,13 @@ func GzipMiddleware(h http.Handler) http.Handler {
 		// сжатие ответа клиенту
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := acceptEncoding != "" && strings.Contains(acceptEncoding, "gzip")
-		var cw *compressWriter
 		if supportsGzip {
-			cw = newCompressWriter(w)
+			cw := newCompressWriter(w)
 			ow = cw
+			defer cw.Close()
 		}
 
 		h.ServeHTTP(ow, r)
-
-		if supportsGzip {
-			cw.Close()
-		}
 	})
 }
 
@@ -144,7 +139,7 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 				clientHash, err := hash.GetHashFromString(clientHashStr)
 				if err != nil {
-					http.Error(w, "Cannot get hash value from header", http.StatusBadRequest)
+					http.Error(w, "Cannot decode hash header", http.StatusBadRequest)
 					return
 				}
 
