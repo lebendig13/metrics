@@ -29,6 +29,7 @@ type AgentConfig struct {
 	ServerAddress string `env:"ADDRESS"`
 	Intervals     AgentConfigIntervals
 	HashKey       string `env:"KEY"`
+	RateLimit     int    `env:"RATE_LIMIT"`
 }
 
 func GetServerConfig() ServerConfig {
@@ -88,6 +89,7 @@ func GetAgentConfig() AgentConfig {
 	flag.IntVar(&result.Intervals.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&result.Intervals.PollInterval, "p", 2, "poll interval")
 	flag.StringVar(&result.HashKey, "k", "", "hash key")
+	flag.IntVar(&result.RateLimit, "l", 1, "rate limit")
 	flag.Parse()
 
 	var envConfig AgentConfig
@@ -118,10 +120,23 @@ func GetAgentConfig() AgentConfig {
 	if envConfig.HashKey != "" {
 		result.HashKey = envConfig.HashKey
 	}
+	rlEnv, rlEnvExists := os.LookupEnv("RATE_LIMIT")
+	if rlEnvExists && rlEnv != "" {
+		rlEnvValue, err := strconv.Atoi(rlEnv)
+		if err != nil {
+			log.Fatalf("Invalid RATE_LIMIT value '%v': %v", rlEnv, err)
+		}
+		result.RateLimit = rlEnvValue
+	}
+	if result.RateLimit < 1 {
+		log.Printf("Rate limit must be positive, got %d; using 1", result.RateLimit)
+		result.RateLimit = 1
+	}
 
 	log.Println("Server address: ", result.ServerAddress,
 		"; pollInterval = ", result.Intervals.PollInterval,
 		"; reportInterval = ", result.Intervals.ReportInterval,
-		"; hash key: ", result.HashKey)
+		"; hash key: ", result.HashKey,
+		"; rate limit = ", result.RateLimit)
 	return result
 }
