@@ -139,7 +139,7 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 			clientHashStr := r.Header.Get("HashSHA256")
 
-			if clientHashStr != "" {
+			if clientHashStr != "" && clientHashStr != "none" {
 				if len(clientHashStr) != 64 {
 					http.Error(w, "Invalid HashSHA256 header length", http.StatusBadRequest)
 					return
