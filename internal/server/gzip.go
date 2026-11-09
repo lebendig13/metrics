@@ -40,13 +40,12 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 	}
 	c.responseDataWritten = true
 
-	ct := c.w.Header().Get("Content-Type")
-	isCompressible := strings.Contains(ct, "application/json") || strings.Contains(ct, "text/html")
-
-	if statusCode < 300 && isCompressible {
-		c.w.Header().Set("Content-Encoding", "gzip")
+	if statusCode < 300 {
+		ct := c.w.Header().Get("Content-Type")
+		if strings.Contains(ct, "application/json") || strings.Contains(ct, "text/html") {
+			c.w.Header().Set("Content-Encoding", "gzip")
+		}
 	}
-
 	c.w.WriteHeader(statusCode)
 }
 
@@ -57,19 +56,9 @@ func (c *compressWriter) Close() error {
 	return nil
 }
 
-func (c *compressWriter) Flush() {
-	if f, ok := c.w.(http.Flusher); ok {
-		if c.w.Header().Get("Content-Encoding") == "gzip" {
-			_ = c.zw.Flush()
-		}
-		f.Flush()
-	}
-}
-
 type compressReader struct {
-	r        io.ReadCloser
-	zr       *gzip.Reader
-	isClosed bool
+	r  io.ReadCloser
+	zr *gzip.Reader
 }
 
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
@@ -84,15 +73,13 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
-func (c *compressReader) Read(p []byte) (n int, err error) {
+func (c compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
 func (c *compressReader) Close() error {
-	if c.isClosed {
-		return nil
+	if err := c.r.Close(); err != nil {
+		return err
 	}
-	c.isClosed = true
-
 	return c.zr.Close()
 }
