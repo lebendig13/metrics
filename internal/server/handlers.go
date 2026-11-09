@@ -98,10 +98,11 @@ func GzipMiddleware(h http.Handler) http.Handler {
 		// чтение сжатого тела запроса от клиента
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := contentEncoding != "" && strings.Contains(contentEncoding, "gzip")
-		if sendsGzip {
+		if sendsGzip && r.ContentLength != 0 {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+				log.Printf("!!! GZIP MIDDLEWARE WARNING: %v", err)
+				h.ServeHTTP(w, r)
 				return
 			}
 			r.Body = cr
