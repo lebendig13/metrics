@@ -17,7 +17,7 @@ type ServerConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         bool   `env:"RESTORE"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
-	HashKey         string `end:"KEY"`
+	HashKey         string `env:"KEY"`
 }
 
 type AgentConfigIntervals struct {
@@ -28,7 +28,7 @@ type AgentConfigIntervals struct {
 type AgentConfig struct {
 	ServerAddress string `env:"ADDRESS"`
 	Intervals     AgentConfigIntervals
-	HashKey       string `end:"KEY"`
+	HashKey       string `env:"KEY"`
 }
 
 func GetServerConfig() ServerConfig {
