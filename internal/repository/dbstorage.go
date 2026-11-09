@@ -80,12 +80,18 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 				_ = tx.Rollback()
 			}()
 
+			stmt, err := tx.PrepareContext(ctx, query)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+
 			for _, m := range metrics {
 				if m.ID == "" {
 					return errors.New("empty metric ID")
 				}
-				if _, err := tx.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value); err != nil {
-					return fmt.Errorf("execute context failed for metric %s: %w", m.ID, err)
+				if _, err := stmt.ExecContext(ctx, m.ID, m.MType, m.Delta, m.Value); err != nil {
+					return err
 				}
 			}
 
