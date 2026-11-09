@@ -187,19 +187,32 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 }
 
 func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("!!! Panic UpdateMetricsBatchHandler: %v", r)
+			res.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
+
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
+		log.Printf("!!! Body reading error: %v", err)
 		logger.Log.Error("Cannot read request body", zap.Error(err))
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	log.Printf(">>> Input json: %s", string(bodyBytes))
+
 	var reqmetrics []models.Metrics
 	if err := json.Unmarshal(bodyBytes, &reqmetrics); err != nil {
+		log.Printf("!!! Body unmarshal error: %v", err)
 		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	log.Printf(">>> Decoded %d reqmetrics", len(reqmetrics))
 
 	for _, reqm := range reqmetrics {
 		if reqm.MType != models.Counter && reqm.MType != models.Gauge {
@@ -208,17 +221,22 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 		}
 	}
 
+	log.Println(">>> s.storage.UpdateMetricsBatch")
 	err = s.storage.UpdateMetricsBatch(req.Context(), reqmetrics)
 	if err != nil {
+		log.Printf("!!! storage error: %v", err)
 		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	log.Println(">>> s.storage.UpdateMetricsBatch success")
+
 	res.Header().Set("Content-Type", "application/json")
 
 	responseBytes, err := json.Marshal(&reqmetrics)
 	if err != nil {
+		log.Printf("!!! marshal error: %v", err)
 		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return
@@ -227,8 +245,11 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 	res.WriteHeader(http.StatusOK)
 
 	if _, err := res.Write(responseBytes); err != nil {
+		log.Printf("!!! res.Write error: %v", err)
 		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
+
+	log.Printf("<<< Success")
 }
 
 func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
