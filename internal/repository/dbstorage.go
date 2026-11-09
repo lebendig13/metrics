@@ -61,14 +61,13 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 	attemptIntervals := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	var lastErr error
 
-	query := `
-		INSERT INTO metrics (id, type, delta, value)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id, type) 
-		DO UPDATE SET 
-			delta = CASE WHEN metrics.type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE metrics.delta END,
-			value = EXCLUDED.value;
-	`
+	counterQuery := `
+		INSERT INTO metrics (id, type, delta) VALUES ($1, 'counter', $2)
+		ON CONFLICT (id, type) DO UPDATE SET delta = metrics.delta + EXCLUDED.delta;`
+
+	gaugeQuery := `
+		INSERT INTO metrics (id, type, value) VALUES ($1, 'gauge', $2)
+		ON CONFLICT (id, type) DO UPDATE SET value = EXCLUDED.value;`
 
 	for i := 0; i <= len(attemptIntervals); i++ {
 		err := func() error {
@@ -78,18 +77,25 @@ func (dbs *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []models.M
 			}
 			defer tx.Rollback()
 
-			stmt, err := tx.PrepareContext(ctx, query)
-			if err != nil {
-				return err
-			}
-			defer stmt.Close()
-
 			for _, m := range metrics {
 				if m.ID == "" {
 					return errors.New("empty metric ID")
 				}
-				if _, err := stmt.ExecContext(ctx, m.ID, m.MType, m.Delta, m.Value); err != nil {
-					return err
+
+				if m.MType == "counter" {
+					if m.Delta == nil {
+						continue
+					}
+					if _, err := tx.ExecContext(ctx, counterQuery, m.ID, *m.Delta); err != nil {
+						return err
+					}
+				} else if m.MType == "gauge" {
+					if m.Value == nil {
+						continue
+					}
+					if _, err := tx.ExecContext(ctx, gaugeQuery, m.ID, *m.Value); err != nil {
+						return err
+					}
 				}
 			}
 
