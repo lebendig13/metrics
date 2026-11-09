@@ -168,12 +168,12 @@ func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 
 			responseBytes := hw.buffer.Bytes()
 
-			if len(responseBytes) > 0 {
-				serverHash, err := hash.GetHashSha256(hashKey, responseBytes)
-				if err == nil {
-					w.Header().Set("HashSHA256", serverHash)
-				}
+			//if len(responseBytes) > 0 {
+			serverHash, err := hash.GetHashSha256(hashKey, responseBytes)
+			if err == nil {
+				w.Header().Set("HashSHA256", serverHash)
 			}
+			//}
 
 			w.WriteHeader(hw.statusCode)
 
