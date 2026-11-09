@@ -125,9 +125,12 @@ func SendMetricsBatch(ctx context.Context, client *http.Client, m []*models.Metr
 		return fmt.Errorf("cannot marshal metrics: %v", err)
 	}
 
-	hashValue, err := hash.GetHashSha256(hashKey, body)
-	if err != nil {
-		log.Printf("%s", err.Error())
+	var hashValue string
+	if hashKey != "" {
+		hashValue, err = hash.GetHashSha256(hashKey, body)
+		if err != nil {
+			log.Printf("%s", err.Error())
+		}
 	}
 
 	compressedBody, err := CompressData(bytes.NewReader(body))
