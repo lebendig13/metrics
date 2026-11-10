@@ -53,7 +53,9 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
-	router.Use(HashSha256Middleware(server.config.HashKey))
+	if server.config.HashKey != "" {
+		router.Use(HashSha256Middleware(server.config.HashKey))
+	}
 	router.Get("/ping", server.PingDB)
 	router.Post("/updates/", server.UpdateMetricsBatchHandler)
 	router.Post("/update", server.UpdateMetricJSONHandler)
@@ -124,6 +126,8 @@ func GzipMiddleware(h http.Handler) http.Handler {
 func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// сейчас HashSha256Middleware подключается только при непустом значении hashKey,
+			// но эту проверку на всякий случай оставим
 			if hashKey == "" {
 				next.ServeHTTP(w, r)
 				return
