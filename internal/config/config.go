@@ -133,10 +133,5 @@ func GetAgentConfig() AgentConfig {
 		result.RateLimit = 1
 	}
 
-	log.Println("Server address: ", result.ServerAddress,
-		"; pollInterval = ", result.Intervals.PollInterval,
-		"; reportInterval = ", result.Intervals.ReportInterval,
-		"; hash key: ", result.HashKey,
-		"; rate limit = ", result.RateLimit)
 	return result
 }
