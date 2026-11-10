@@ -6,30 +6,28 @@ import (
 	"log"
 	"os"
 	"strconv"
-
-	"github.com/caarlos0/env/v11"
 )
 
 type ServerConfig struct {
-	RunAddress      string `env:"ADDRESS"`
-	LogLevel        string `env:"LOG_LEVEL"`
-	StoreInterval   int    `env:"STORE_INTERVAL"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	Restore         bool   `env:"RESTORE"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
-	HashKey         string `env:"KEY"`
+	RunAddress      string
+	LogLevel        string
+	StoreInterval   int
+	FileStoragePath string
+	Restore         bool
+	DatabaseDSN     string
+	HashKey         string
 }
 
 type AgentConfigIntervals struct {
-	ReportInterval int `env:"REPORT_INTERVAL"`
-	PollInterval   int `env:"POLL_INTERVAL"`
+	ReportInterval int
+	PollInterval   int
 }
 
 type AgentConfig struct {
-	ServerAddress string `env:"ADDRESS"`
+	ServerAddress string
 	Intervals     AgentConfigIntervals
-	HashKey       string `env:"KEY"`
-	RateLimit     int    `env:"RATE_LIMIT"`
+	HashKey       string
+	RateLimit     int
 }
 
 func GetServerConfig() ServerConfig {
@@ -43,17 +41,16 @@ func GetServerConfig() ServerConfig {
 	flag.StringVar(&result.HashKey, "k", "", "hash key")
 	flag.Parse()
 
-	var envConfig ServerConfig
-	err := env.Parse(&envConfig)
-	if err != nil {
-		log.Fatal("Cannot get environment variables \"ADDRESS\", \"LOG_LEVEL\", \"STORE_INTERVAL\", \"FILE_STORAGE_PATH\", \"RESTORE\", \"DATABASE_DSN\": ", err)
+	runAddrEnv, runAddrEnvExists := os.LookupEnv("ADDRESS")
+	if runAddrEnvExists && runAddrEnv != "" {
+		result.RunAddress = runAddrEnv
 	}
-	if envConfig.RunAddress != "" {
-		result.RunAddress = envConfig.RunAddress
+
+	logLvlEnv, logLvlEnvExists := os.LookupEnv("LOG_LEVEL")
+	if logLvlEnvExists && logLvlEnv != "" {
+		result.LogLevel = logLvlEnv
 	}
-	if envConfig.LogLevel != "" {
-		result.LogLevel = envConfig.LogLevel
-	}
+
 	siEnv, siEnvExists := os.LookupEnv("STORE_INTERVAL")
 	if siEnvExists && siEnv != "" {
 		siEnvValue, err := strconv.Atoi(siEnv)
@@ -62,9 +59,12 @@ func GetServerConfig() ServerConfig {
 		}
 		result.StoreInterval = siEnvValue
 	}
-	if envConfig.FileStoragePath != "" {
-		result.FileStoragePath = envConfig.FileStoragePath
+
+	fspathEnv, fspathEnvExists := os.LookupEnv("FILE_STORAGE_PATH")
+	if fspathEnvExists && fspathEnv != "" {
+		result.FileStoragePath = fspathEnv
 	}
+
 	rEnv, rEnvExists := os.LookupEnv("RESTORE")
 	if rEnvExists && rEnv != "" {
 		rEnvValue, err := strconv.ParseBool(rEnv)
@@ -73,12 +73,17 @@ func GetServerConfig() ServerConfig {
 		}
 		result.Restore = rEnvValue
 	}
-	if envConfig.DatabaseDSN != "" {
-		result.DatabaseDSN = envConfig.DatabaseDSN
+
+	dsnEnv, dsnEnvExists := os.LookupEnv("DATABASE_DSN")
+	if dsnEnvExists && dsnEnv != "" {
+		result.DatabaseDSN = dsnEnv
 	}
-	if envConfig.HashKey != "" {
-		result.HashKey = envConfig.HashKey
+
+	hkEnv, hkEnvExists := os.LookupEnv("KEY")
+	if hkEnvExists && hkEnv != "" {
+		result.HashKey = hkEnv
 	}
+
 	return result
 }
 
@@ -92,15 +97,11 @@ func GetAgentConfig() AgentConfig {
 	flag.IntVar(&result.RateLimit, "l", 1, "rate limit")
 	flag.Parse()
 
-	var envConfig AgentConfig
-	err := env.Parse(&envConfig)
-	if err != nil {
-		log.Fatal("Cannot get environment variables \"ADDRESS\", \"REPORT_INTERVAL\", \"POLL_INTERVAL\": ", err)
+	serverAddrEnv, serverAddrEnvExists := os.LookupEnv("ADDRESS")
+	if serverAddrEnvExists && serverAddrEnv != "" {
+		result.ServerAddress = serverAddrEnv
 	}
 
-	if envConfig.ServerAddress != "" {
-		result.ServerAddress = envConfig.ServerAddress
-	}
 	riEnv, riEnvExists := os.LookupEnv("REPORT_INTERVAL")
 	if riEnvExists && riEnv != "" {
 		riEnvValue, err := strconv.Atoi(riEnv)
@@ -109,6 +110,7 @@ func GetAgentConfig() AgentConfig {
 		}
 		result.Intervals.ReportInterval = riEnvValue
 	}
+
 	piEnv, piEnvExists := os.LookupEnv("POLL_INTERVAL")
 	if piEnvExists && piEnv != "" {
 		piEnvValue, err := strconv.Atoi(piEnv)
@@ -117,9 +119,12 @@ func GetAgentConfig() AgentConfig {
 		}
 		result.Intervals.PollInterval = piEnvValue
 	}
-	if envConfig.HashKey != "" {
-		result.HashKey = envConfig.HashKey
+
+	hkEnv, hkEnvExists := os.LookupEnv("KEY")
+	if hkEnvExists && hkEnv != "" {
+		result.HashKey = hkEnv
 	}
+
 	rlEnv, rlEnvExists := os.LookupEnv("RATE_LIMIT")
 	if rlEnvExists && rlEnv != "" {
 		rlEnvValue, err := strconv.Atoi(rlEnv)
