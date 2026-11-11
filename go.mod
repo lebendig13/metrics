@@ -3,6 +3,7 @@ module github.com/lebendig13/metrics
 go 1.27.0
 
 require (
+	github.com/caarlos0/env/v11 v11.4.2
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/golang-migrate/migrate/v4 v4.20.1
