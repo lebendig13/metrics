@@ -355,7 +355,7 @@ func TestUpdateMetricJSONHandler(t *testing.T) {
 			method: http.MethodPost,
 			body:   `{"id":"PollCount", "type":"unknown_type", "delta":"test"}`,
 			want: want{
-				code: http.StatusInternalServerError,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
@@ -363,7 +363,7 @@ func TestUpdateMetricJSONHandler(t *testing.T) {
 			method: http.MethodPost,
 			body:   `{"id":"Alloc", "type":"gauge", "value":"test"}`,
 			want: want{
-				code: http.StatusInternalServerError,
+				code: http.StatusBadRequest,
 			},
 		},
 	}

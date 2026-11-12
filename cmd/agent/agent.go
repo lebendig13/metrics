@@ -7,12 +7,19 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"strconv"
+	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 
 	handler "github.com/lebendig13/metrics/internal/agent"
 	config "github.com/lebendig13/metrics/internal/config"
 	models "github.com/lebendig13/metrics/internal/model"
 )
+
+const sendTimeout = 15 * time.Second
 
 type Intervals struct {
 	PollInterval   time.Duration
@@ -22,6 +29,13 @@ type Intervals struct {
 type Agent struct {
 	baseURL   string
 	intervals Intervals
+	pollCount int64
+	hashKey   string
+	rateLimit int
+}
+
+type sendJob struct {
+	metrics   []*models.Metrics
 	pollCount int64
 }
 
@@ -33,6 +47,8 @@ func NewAgentDefault() *Agent {
 			ReportInterval: time.Duration(10) * time.Second,
 		},
 		pollCount: 0,
+		hashKey:   "",
+		rateLimit: 1,
 	}
 }
 
@@ -44,39 +60,169 @@ func NewAgent(cnf *config.AgentConfig) *Agent {
 			ReportInterval: time.Duration(cnf.Intervals.ReportInterval) * time.Second,
 		},
 		pollCount: 0,
+		hashKey:   cnf.HashKey,
+		rateLimit: cnf.RateLimit,
 	}
 }
 
-func (a *Agent) Process() {
+func (a *Agent) Process(ctx context.Context) {
 	log.Println("Agent started")
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	rng := rand.New(rand.NewSource((time.Now().UnixNano())))
+	sendJobs := make(chan sendJob, a.rateLimit)
+	results := make(chan int64, a.rateLimit)
 
-	var timeSinceLastReport time.Duration
+	var workersWg sync.WaitGroup
+	for i := 1; i <= a.rateLimit; i++ {
+		workersWg.Add(1)
+		go func(id int) {
+			defer workersWg.Done()
+			a.sendWorker(ctx, id, client, sendJobs, results)
+		}(i)
+	}
+
+	systemMetrics := make(chan []*models.Metrics, 1)
+
+	var collectorsWg sync.WaitGroup
+	collectorsWg.Add(2)
+	go func() {
+		defer collectorsWg.Done()
+		a.collectSystem(ctx, systemMetrics)
+	}()
+	go func() {
+		defer collectorsWg.Done()
+		a.collect(ctx, sendJobs, results, systemMetrics)
+	}()
+
+	collectorsWg.Wait()
+	close(sendJobs)
+	workersWg.Wait()
+	log.Println("Agent stopped")
+}
+
+func (a *Agent) collect(ctx context.Context, jobs chan<- sendJob, result <-chan int64, systemMetrics <-chan []*models.Metrics) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	pollTicker := time.NewTicker(a.intervals.PollInterval)
+	defer pollTicker.Stop()
+	reportTicker := time.NewTicker(a.intervals.ReportInterval)
+	defer reportTicker.Stop()
+
+	var currentMetrics []*models.Metrics
+	var currentSystemMetrics []*models.Metrics
 	for {
-		time.Sleep(a.intervals.PollInterval)
+		select {
+		case <-ctx.Done():
+			return
 
-		currentMetrics := a.GetMetrics(rng)
-		log.Println("Got all metrics. PollCount = ", a.pollCount)
+		case n := <-result:
+			a.pollCount += n
 
-		timeSinceLastReport += a.intervals.PollInterval
-		if timeSinceLastReport >= a.intervals.ReportInterval {
-			log.Println("Start sending metrics to server")
-			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			err := handler.SendMetricsBatch(sendCtx, client, currentMetrics, a.baseURL)
-			cancel()
+		case currentSystemMetrics = <-systemMetrics:
 
-			if err == nil {
-				a.pollCount = 0
-			} else {
-				log.Println("Failed to send metrics batch: ", err)
+		case <-pollTicker.C:
+			currentMetrics = a.GetMetrics(rng)
+			log.Println("Got all metrics. PollCount = ", a.pollCount)
+
+		case <-reportTicker.C:
+			if currentMetrics == nil {
+				continue
 			}
-			timeSinceLastReport = 0
+			job := a.newSendJob(currentMetrics, currentSystemMetrics)
+			select {
+			case jobs <- job:
+				a.pollCount = 0
+				log.Println("Start sending metrics to server")
+			default:
+				log.Println("All workers are busy, skip sending metrics")
+			}
 		}
 	}
+}
+
+func (a *Agent) newSendJob(snapshot []*models.Metrics, systemSnapshot []*models.Metrics) sendJob {
+	pollCount := a.pollCount
+	metrics := make([]*models.Metrics, 0, len(snapshot)+len(systemSnapshot))
+	for _, m := range snapshot {
+		if m.ID != "PollCount" {
+			metrics = append(metrics, m)
+		}
+	}
+	metrics = append(metrics, systemSnapshot...)
+	metrics = append(metrics, &models.Metrics{
+		ID:    "PollCount",
+		MType: models.Counter,
+		Delta: &pollCount,
+	})
+	return sendJob{metrics: metrics, pollCount: pollCount}
+}
+
+func (a *Agent) sendWorker(ctx context.Context, id int, client *http.Client, jobs <-chan sendJob, result chan<- int64) {
+	for job := range jobs {
+		sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+		err := handler.SendMetricsBatch(sendCtx, client, job.metrics, a.baseURL, a.hashKey)
+		cancel()
+
+		if err == nil {
+			log.Printf("Worker %d: metrics batch sent", id)
+			continue
+		}
+
+		log.Printf("Worker %d: failed to send metrics batch: %v", id, err)
+		select {
+		case result <- job.pollCount:
+		case <-ctx.Done():
+		}
+	}
+}
+
+func (a *Agent) collectSystem(ctx context.Context, out chan []*models.Metrics) {
+	ticker := time.NewTicker(a.intervals.PollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			metrics, err := GetSystemMetrics(ctx)
+			if err != nil {
+				log.Println("Cannot get system metrics: ", err)
+				continue
+			}
+			select {
+			case <-out:
+			default:
+			}
+			out <- metrics
+		}
+	}
+}
+
+func GetSystemMetrics(ctx context.Context) ([]*models.Metrics, error) {
+	vm, err := mem.VirtualMemoryWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get memory stats: %w", err)
+	}
+	cpuPercents, err := cpu.PercentWithContext(ctx, 0, true)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get CPU utilization: %w", err)
+	}
+
+	result := make([]*models.Metrics, 0, 2+len(cpuPercents))
+	newGauge := func(id string, value float64) *models.Metrics {
+		return &models.Metrics{ID: id, MType: models.Gauge, Value: &value}
+	}
+	result = append(result,
+		newGauge("TotalMemory", float64(vm.Total)),
+		newGauge("FreeMemory", float64(vm.Free)),
+	)
+	for i, p := range cpuPercents {
+		result = append(result, newGauge("CPUutilization"+strconv.Itoa(i+1), p))
+	}
+	return result, nil
 }
 
 func (a *Agent) GetMetrics(rng *rand.Rand) []*models.Metrics {
@@ -124,11 +270,12 @@ func (a *Agent) GetMetrics(rng *rand.Rand) []*models.Metrics {
 	}
 
 	a.pollCount++
+	pollCount := a.pollCount
 	newPollCount := &models.Metrics{
 		ID:    "PollCount",
 		MType: models.Counter,
+		Delta: &pollCount,
 	}
-	newPollCount.Delta = &a.pollCount
 
 	result = append(result, newPollCount)
 	return result

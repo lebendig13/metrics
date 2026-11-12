@@ -28,7 +28,7 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 	if !c.responseDataWritten {
 		c.WriteHeader(http.StatusOK)
 	}
-	if c.w.Header().Get("Content-Encoding") == "gzip" {
+	if c.w.Header().Get("Content-Encoding") == "gzip" && len(p) > 0 {
 		return c.zw.Write(p)
 	}
 	return c.w.Write(p)

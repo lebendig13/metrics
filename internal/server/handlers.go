@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"html/template"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/lebendig13/metrics/internal/config"
+	"github.com/lebendig13/metrics/internal/hash"
 	"github.com/lebendig13/metrics/internal/logger"
 	models "github.com/lebendig13/metrics/internal/model"
 	"github.com/lebendig13/metrics/internal/repository"
@@ -51,6 +53,9 @@ func MetricsRouter(server *Server) chi.Router {
 	router := chi.NewRouter()
 	router.Use(RequestLogger(logger.Log))
 	router.Use(GzipMiddleware)
+	if server.config.HashKey != "" {
+		router.Use(HashSha256Middleware(server.config.HashKey))
+	}
 	router.Get("/ping", server.PingDB)
 	router.Post("/updates/", server.UpdateMetricsBatchHandler)
 	router.Post("/update", server.UpdateMetricJSONHandler)
@@ -82,6 +87,7 @@ func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 				zap.Int("size", lw.BytesWritten()),
 				zap.String("content-type", lw.Header().Get("Content-Type")),
 				zap.String("content-encoding", lw.Header().Get("Content-Encoding")),
+				zap.String("hash", lw.Header().Get("HashSHA256")),
 			)
 		})
 	}
@@ -117,12 +123,76 @@ func GzipMiddleware(h http.Handler) http.Handler {
 	})
 }
 
+func HashSha256Middleware(hashKey string) func(h http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// сейчас HashSha256Middleware подключается только при непустом значении hashKey,
+			// но эту проверку на всякий случай оставим
+			if hashKey == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "Internal Server Error: cannot read body", http.StatusInternalServerError)
+				return
+			}
+			r.Body.Close()
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+			clientHashStr := r.Header.Get("HashSHA256")
+
+			if clientHashStr != "" {
+				clientHash, err := hash.GetHashFromString(clientHashStr)
+				if err != nil {
+					http.Error(w, "Cannot decode hash header", http.StatusBadRequest)
+					return
+				}
+
+				if !hash.CheckHashSha256(hashKey, clientHash, bodyBytes) {
+					http.Error(w, "Bad request: hash verification failed", http.StatusBadRequest)
+					return
+				}
+			}
+
+			hw := &hashWriter{
+				ResponseWriter: w,
+				buffer:         bytes.NewBuffer(nil),
+				hashKey:        hashKey,
+				statusCode:     http.StatusOK,
+			}
+
+			next.ServeHTTP(hw, r)
+
+			responseBytes := hw.buffer.Bytes()
+
+			serverHash, err := hash.GetHashSha256(hashKey, responseBytes)
+			if err == nil {
+				w.Header().Set("HashSHA256", serverHash)
+			}
+
+			w.WriteHeader(hw.statusCode)
+
+			if len(responseBytes) > 0 {
+				w.Write(responseBytes)
+			}
+		})
+	}
+}
+
 func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		logger.Log.Error("Cannot read request body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var reqmetrics []models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqmetrics); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
-		res.WriteHeader(http.StatusInternalServerError)
+	if err := json.Unmarshal(bodyBytes, &reqmetrics); err != nil {
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -133,7 +203,7 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 		}
 	}
 
-	err := s.storage.UpdateMetricsBatch(req.Context(), reqmetrics)
+	err = s.storage.UpdateMetricsBatch(req.Context(), reqmetrics)
 	if err != nil {
 		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
@@ -141,24 +211,36 @@ func (s *Server) UpdateMetricsBatchHandler(res http.ResponseWriter, req *http.Re
 	}
 
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
 
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(&reqmetrics); err != nil {
+	responseBytes, err := json.Marshal(&reqmetrics)
+	if err != nil {
 		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
-	}
-}
-
-func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
-	var reqm models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqm); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	err := s.storage.InsertOrUpdate(req.Context(), reqm)
+	res.WriteHeader(http.StatusOK)
+
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
+	}
+}
+
+func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var reqm models.Metrics
+	if err := json.Unmarshal(bodyBytes, &reqm); err != nil {
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = s.storage.InsertOrUpdate(req.Context(), reqm)
 	if err != nil {
 		logger.Log.Error("Internal server error: cannot save metric to storage", zap.Error(err))
 		res.WriteHeader(http.StatusInternalServerError)
@@ -168,11 +250,16 @@ func (s *Server) UpdateMetricJSONHandler(res http.ResponseWriter, req *http.Requ
 	s.SaveMetricsIfNecessary(req.Context())
 
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(&reqm); err != nil {
+	responseBytes, err := json.Marshal(&reqm)
+	if err != nil {
 		logger.Log.Error("Cannot encode response JSON", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
 }
 
@@ -273,11 +360,16 @@ func (s *Server) GetMetricHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var reqm models.Metrics
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&reqm); err != nil {
-		logger.Log.Error("Internal server error: cannot decode request JSON body", zap.Error(err))
-		res.WriteHeader(http.StatusInternalServerError)
+	if err := json.Unmarshal(bodyBytes, &reqm); err != nil {
+		logger.Log.Error("Bad request: cannot decode request JSON body", zap.Error(err))
+		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -299,12 +391,16 @@ func (s *Server) ValueJSONHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-
-	enc := json.NewEncoder(res)
-	if err := enc.Encode(metric); err != nil {
+	responseBytes, err := json.Marshal(metric)
+	if err != nil {
 		logger.Log.Error("error encoding response", zap.Error(err))
+		res.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	if _, err := res.Write(responseBytes); err != nil {
+		logger.Log.Error("Cannot write response bytes", zap.Error(err))
 	}
 }
 
